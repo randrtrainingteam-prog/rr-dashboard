@@ -1,0 +1,2958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R&R BBQ — Weekly Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #FAF8F5;
+  --card: #FFFFFF;
+  --card2: #F7F5F2;
+  --border: #E8E0D8;
+  --text: #2C2420;
+  --muted: #8C7B6B;
+  --gold: #C4922A;
+  --gold-light: #F5EDDB;
+  --brown: #5C3D2E;
+  --brown-light: #8B6F5E;
+  --green: #2D8F4E;
+  --green-bg: #E8F5EC;
+  --red: #C0392B;
+  --red-bg: #FBEAEA;
+  --yellow: #D4A017;
+  --yellow-bg: #FFF8E1;
+  --blue: #2E6B9E;
+  --chart-2026: #C4922A;
+  --chart-2025: #9EAAB5;
+  --chart-seasonal: #D4A017;
+  --chart-budget: #C0392B;
+  --chart-brand: #8C7B6B;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Calibri','Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:13px; }
+
+/* ── Top Bar ── */
+.top-bar { display:flex; align-items:center; justify-content:space-between; padding:12px 24px; background:var(--card); border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px; }
+.brand { display:flex; align-items:baseline; gap:10px; }
+.brand-name { font-size:18px; font-weight:700; color:var(--brown); }
+.brand-sub { font-size:12px; font-weight:400; color:var(--muted); }
+.district-filter { display:flex; gap:4px; }
+.district-btn { border:1px solid var(--border); border-radius:4px; padding:4px 14px; font-size:12px; background:transparent; color:var(--text); cursor:pointer; font-family:inherit; }
+.district-btn.active { background:var(--brown); color:#fff; border-color:var(--brown); }
+.week-select-wrap { display:flex; align-items:center; gap:6px; }
+.week-select-wrap label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; }
+.week-select-wrap select { padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:12px; font-family:inherit; background:var(--card); }
+.reload-btn { display:none; border:1px solid var(--border); border-radius:4px; padding:4px 10px; font-size:11px; background:transparent; color:var(--muted); cursor:pointer; font-family:inherit; }
+.reload-btn:hover { background:var(--gold-light); }
+
+/* ── Tabs ── */
+.tab-bar { display:flex; background:var(--card); border-bottom:1px solid var(--border); padding:0 24px; overflow-x:auto; }
+.tab-btn { border:none; border-bottom:2px solid transparent; padding:10px 20px; background:transparent; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; font-family:inherit; white-space:nowrap; }
+.tab-btn.active { border-bottom-color:var(--gold); color:var(--gold); font-weight:700; }
+.tab-btn:hover:not(.active) { color:var(--text); }
+
+/* ── Upload ── */
+.upload-zone { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:340px; border:2px dashed var(--border); border-radius:12px; margin:32px 24px; padding:40px; text-align:center; cursor:pointer; transition:border-color .2s, background .2s; }
+.upload-zone:hover, .upload-zone.dragover { border-color:var(--gold); background:var(--gold-light); }
+.upload-zone h2 { font-size:16px; font-weight:700; color:var(--brown); margin-bottom:6px; }
+.upload-zone p { font-size:12px; color:var(--muted); }
+.upload-zone.hidden { display:none; }
+
+/* ── Content ── */
+#content { padding:20px 24px; }
+
+/* ── Cards ── */
+.card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:16px; }
+.card-title { font-size:11px; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:var(--muted); margin-bottom:12px; }
+
+/* ── KPI Tiles ── */
+.kpi-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.kpi-tile { flex:1; min-width:160px; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; }
+.kpi-tile.large .kpi-value { font-size:34px; }
+.kpi-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.kpi-value { font-size:28px; font-weight:700; color:var(--text); line-height:1.2; }
+.kpi-change { font-size:11px; margin-top:4px; display:flex; align-items:center; gap:4px; }
+.kpi-subtitle { font-size:11px; color:var(--muted); margin-top:4px; }
+
+/* ── Tables ── */
+.table-wrap { overflow-x:auto; }
+table.data-table { width:100%; border-collapse:collapse; }
+table.data-table thead th { background:var(--brown); color:#fff; text-align:left; padding:8px 10px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer; user-select:none; white-space:nowrap; }
+table.data-table thead th:hover { background:var(--brown-light); }
+table.data-table tbody td { padding:8px 10px; border-bottom:1px solid var(--border); font-size:13px; }
+table.data-table tbody tr:nth-child(even) { background:var(--card2); }
+table.data-table tbody tr:hover { background:var(--gold-light); }
+table.data-table tbody tr.highlight { background:var(--gold-light); font-weight:600; }
+table.data-table .group-header td { background:var(--brown); color:#fff; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; padding:6px 10px; }
+
+/* ── Alert Rows ── */
+.alert-row { display:flex; align-items:flex-start; gap:10px; padding:10px 14px; margin-bottom:6px; border-radius:6px; }
+.alert-row.red { border-left:3px solid var(--red); background:var(--red-bg); }
+.alert-row.yellow { border-left:3px solid var(--yellow); background:var(--yellow-bg); }
+.alert-row.green { border-left:3px solid var(--green); background:var(--green-bg); }
+.alert-headline { font-weight:700; font-size:13px; }
+.alert-detail { font-size:12px; color:var(--muted); margin-top:2px; }
+.alert-impact { font-size:11px; font-weight:600; margin-top:4px; }
+
+/* ── Validation ── */
+.validation-summary { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; max-width:600px; margin:40px auto; }
+.validation-summary h3 { font-size:14px; font-weight:700; margin-bottom:10px; color:var(--brown); }
+.validation-summary .row { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; }
+.validation-summary .label { color:var(--muted); }
+.validation-summary .value { font-weight:600; }
+.validation-summary .warn { color:var(--yellow); }
+
+/* ── Responsive ── */
+/* ── Store Scorecard: Deep Dive ── */
+.dive-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; border-left: 3px solid var(--gold); }
+.dive-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+.dive-close { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 14px; color: var(--muted); }
+.dive-close:hover { background: var(--card2); color: var(--text); }
+.narrative-card { background: var(--gold-light); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; font-size: 14px; line-height: 1.6; color: var(--text); }
+.decomp-sentence { font-size: 15px; text-align: center; padding: 12px 20px; color: var(--text); line-height: 1.5; }
+.season-note { font-size: 12px; font-style: italic; text-align: center; color: var(--muted); padding: 4px 20px 8px; }
+.chart-row { display: flex; gap: 16px; margin-bottom: 16px; }
+.chart-row > div { flex: 1; min-width: 0; }
+.alert-store-link { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--muted); cursor: pointer; }
+.alert-store-link:hover { color: var(--gold); border-bottom-color: var(--gold); }
+.green-stores-note { font-size: 12px; color: var(--muted); padding: 8px 14px; }
+.district-summary-table td { padding: 8px 12px; font-size: 13px; }
+.dim-bar { display: flex; align-items: center; gap: 4px; }
+.dim-track { width: 40px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.dim-fill { height: 100%; border-radius: 3px; }
+.dim-score { font-size: 11px; min-width: 16px; }
+.cost-narrative { font-size: 13px; color: var(--text); padding: 10px 16px; background: var(--card2); border-radius: 6px; margin-top: 8px; }
+.leading-warn { background: var(--yellow-bg); border: 1px solid var(--yellow); border-radius: 6px; padding: 10px 14px; font-size: 13px; margin: 8px 0; }
+.leading-ok { font-size: 12px; color: var(--muted); padding: 4px 0; }
+
+/* Budget progress bar */
+.budget-progress { background: var(--border); height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.budget-progress-fill { background: var(--gold); height: 100%; border-radius: 4px; transition: width 0.3s; }
+.budget-progress-label { font-size: 11px; color: var(--muted); text-align: center; margin-top: 4px; }
+
+/* Period selector */
+.period-sel { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; background: var(--card); color: var(--text); cursor: pointer; font-family: inherit; }
+.period-sel:focus { outline: none; border-color: var(--gold); }
+
+/* Waterfall labels */
+.waterfall-summary { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text); padding: 8px 0; justify-content: center; }
+.waterfall-summary span { white-space: nowrap; }
+
+/* Comparison table */
+.compare-table { width: 100%; border-collapse: collapse; }
+.compare-table th { background: var(--brown); color: white; padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; }
+.compare-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.compare-table tr:nth-child(even) td { background: var(--card2); }
+
+/* Envelope headroom */
+.headroom-pos { color: var(--green); font-weight: 600; }
+.headroom-neg { color: var(--red); font-weight: 600; }
+
+/* ── Responsive ── */
+@media (max-width:768px) {
+  .kpi-row { flex-direction:column; }
+  .kpi-tile { min-width:auto; }
+  .top-bar { flex-direction:column; align-items:flex-start; }
+  .tab-bar { padding:0 12px; }
+  .tab-btn { padding:8px 12px; font-size:12px; }
+  #content { padding:12px; }
+  .kpi-value { font-size:22px; }
+  .chart-row { flex-direction:column; }
+}
+
+/* Menu toggle */
+.menu-toggle { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.menu-toggle button { padding: 6px 16px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all 0.15s; }
+.menu-toggle button.active { background: var(--brown); color: white; }
+.menu-toggle button:not(.active) { background: var(--card); color: var(--text); }
+.menu-toggle button:not(.active):hover { background: var(--card2); }
+
+/* Plate color swatches */
+.plate-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+
+/* Cannibalization narrative */
+.cannibal-narrative { font-size: 13px; color: var(--text); padding: 10px 16px; background: var(--card2); border-radius: 6px; margin-top: 8px; line-height: 1.5; }
+
+/* New item badge */
+.new-badge { background: var(--gold-light); color: var(--gold); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; }
+
+/* Section separator for menu sections */
+.menu-section { margin-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <div class="brand">
+    <span class="brand-name">R&R BBQ</span>
+    <span class="brand-sub">Weekly Intelligence Dashboard</span>
+    <button class="reload-btn" id="reloadBtn" onclick="resetUpload()">Refresh Data</button>
+  </div>
+  <div class="district-filter" id="districtFilter" style="display:none">
+    <button class="district-btn active" data-district="All" onclick="setDistrict('All')">All</button>
+    <button class="district-btn" data-district="North" onclick="setDistrict('North')">North</button>
+    <button class="district-btn" data-district="South" onclick="setDistrict('South')">South</button>
+  </div>
+  <div class="week-select-wrap" id="weekSelectWrap" style="display:none">
+    <label>Week</label>
+    <select id="weekSelect" onchange="setWeek(+this.value)"></select>
+  </div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar" id="tabBar" style="display:none">
+  <button class="tab-btn active" data-tab="command" onclick="setTab('command')">Command Center</button>
+  <button class="tab-btn" data-tab="traffic" onclick="setTab('traffic')">Traffic & Channels</button>
+  <button class="tab-btn" data-tab="scorecard" onclick="setTab('scorecard')">Store Scorecard</button>
+  <button class="tab-btn" data-tab="financials" onclick="setTab('financials')">Financials</button>
+  <button class="tab-btn" data-tab="menu" onclick="setTab('menu')">Menu Intelligence</button>
+  <button class="tab-btn" data-tab="trajectory" onclick="setTab('trajectory')">Brand Trajectory</button>
+</div>
+
+<!-- Upload Zone -->
+<div class="upload-zone" id="uploadZone">
+  <div id="autoLoadMsg">
+    <h2>Loading latest data...</h2>
+    <p>Fetching Weekly Fact Table from OneDrive</p>
+    <div style="width:200px;height:4px;background:var(--border);border-radius:2px;margin:16px auto;overflow:hidden"><div id="loadBar" style="width:0%;height:100%;background:var(--gold);border-radius:2px;transition:width 0.5s"></div></div>
+  </div>
+  <div id="manualUpload" style="display:none" onclick="document.getElementById('fileInput').click()">
+    <h2>Drop your Weekly Fact Table Excel file here</h2>
+    <p>or click to browse — auto-load unavailable</p>
+    <p style="margin-top:8px"><a href="https://ffgoffice-my.sharepoint.com/:x:/g/personal/nbreneman_randrbbq_com/IQD77gLBVq6IT4W1m06sVdeVAa5aPNLhFdXRBy-xf-YhBsI?e=jhtxPd" target="_blank" style="color:var(--gold);font-size:12px">Download latest Excel from OneDrive ↗</a></p>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])">
+</div>
+
+<!-- Content -->
+<div id="content"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 3 — STATE
+   ═══════════════════════════════════════════════════════════════════ */
+const S = {
+  tab: 'command',
+  week: null,
+  district: 'All',
+  store: null,
+  menuView: 'Period',
+  menuPeriod: null,
+  trajectoryPeriod: null,
+  data: {
+    weekly:[], budget:[], brandHistory:[], seasonality:[], channelSeasonality:[],
+    pmixPeriod2026:[], pmixPeriod2025:[], pmixWeekly2026:[], pmixWeekly2025:[],
+    priorYear:[], stores:[], calendar:[], salary:[],
+    availableWeeks:[], availablePeriods:[], currentPeriod:null, weekToPeriod:{}
+  },
+  features: { hasSeasonality:false, hasChannelSeasonality:false, hasPmixWeekly:false, hasSalary:false },
+  computed: {}
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 4 — CONFIGURATION
+   ═══════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  districts: {
+    'North': ['Salt Lake City','South Jordan','Farmington','North Salt Lake','Midvale','Boise','Meridian'],
+    'South': ['Lehi','Pleasant Grove','Provo','Spanish Fork','Riverton']
+  },
+  destinationChannels: ['Dine-in','Marketplace','Dine-in To Go','Online Orders','Catering','Drive Thru','Olo Dispatch','Call-In','Vending'],
+  materialChannels: ['Dine-in','Marketplace','Dine-in To Go','Online Orders','Catering'],
+  dayparts: ['11am','2pm','5pm'],
+  daypartLabels: {'6am':'Early / Catering Prep','11am':'Lunch','2pm':'Afternoon','5pm':'Dinner'},
+  allDayparts: ['6am','11am','2pm','5pm'],
+  weeksPerPeriod: 4,
+  periodsPerYear: 13,
+  thresholds: {
+    guestScoreRed: 60, guestScoreGreen: 75,
+    consecutiveOrderDeclineWeeks: 2,
+    foodCostOverBudgetPct: 0.02,
+    cateringDeclinePct: -0.15,
+    channelMixShiftPct: 0.03
+  },
+  ratingAnchors: [
+    {value:3.7,score:0},{value:4.0,score:15},{value:4.2,score:25},
+    {value:4.4,score:32},{value:4.6,score:38},{value:4.7,score:40}
+  ],
+  lowPctAnchors: [
+    {value:0,score:40},{value:0.10,score:32},{value:0.18,score:22},
+    {value:0.25,score:10},{value:0.35,score:4},{value:0.40,score:0}
+  ],
+  responseAnchors: [
+    {value:0,score:0},{value:0.50,score:3},{value:0.70,score:6},
+    {value:0.90,score:9},{value:1.0,score:10}
+  ],
+  volumeBonusMedian: 41,
+  volumeBonusMax: 5,
+  smoothingWeights: [0.50, 0.30, 0.20],
+  rankDimensions: {
+    salesMomentum: {max:20, label:'Sales Momentum'},
+    trafficDirection: {max:25, label:'Traffic Direction'},
+    costDiscipline: {max:20, label:'Cost Discipline'},
+    guestHealth: {max:15, label:'Guest Health'},
+    budgetPace: {max:20, label:'Budget Pace'}
+  },
+  itemClassifier: {
+    ENTREE_PLATE:['meat plate','r&r plate','founders platter','uvu meat'],
+    ENTREE_SANDWICH:['pulled pork sandwich','pineapple pork sand','caveman burger','cheese burger','chicken sandwich','turkey sandwich','chopped brisket sand','sliced brisket sand','r&r sandwich bar'],
+    ENTREE_VALUE:['buddy bowl','taco trio','bbq burrito','brisket tacos','bbq pork tacos','bbq chicken tacos','rib tip'],
+    ENTREE_OTHER:['half rack','smoked wings','wing special','nachos','cobb salad','brisket salad','chicken salad','pulled pork salad','bbq salad','pork mac','brisket nacho','chicken nacho','pork nacho','bbq box'],
+    SIDE:['mac and cheese','mac & cheese','bbq beans','french fries','sweet potato fries','coleslaw','creamed corn','potato salad','garlic masher','mashed potato','hush pup','fried pickle','garden salad','side salad','cornbread','dinner roll','dozen roll','onion ring','jalapen','chips & queso','original bbq sauce'],
+    LOADED_SIDE:['baked potato'],
+    DESSERT:['cobbler','peach cobbler','pudding','banana pudding','cookie','brownie'],
+    DRINK:['soda',' tea','lemonade','water','coke','sprite','dr pepper','root beer','fanta','mello','pepsi','coffee','juice','drink'],
+    KIDS:['kids '],
+    BY_THE_POUND:['1#','1/2#','1 lb','per pound','by the pound'],
+    FAMILY_PACK:['family meal','wings pack','smoked wings pack'],
+    MODIFIER:['brisket - sliced','brisket - chopped','c-2 meat brisket','pulled pork -','turkey -','sausage -','chicken -','pork loin -','boneless chicken -','ribs -'],
+    CATERING_ITEM:['c- r&r','c- dozen','c- mac','e-half','e-pork','fmp'],
+    NON_FOOD:['gift card','doordash driver tip','doordash delivery fee','delivery fee','discount','merch','void','comp ']
+  },
+  signalPatterns: {
+    BALANCED_GROWTH: {salesUp:true, ordersUp:true, label:'Balanced Growth', color:'var(--green)'},
+    CHECK_INFLATION: {salesUp:true, ordersUp:false, label:'Check Inflation', color:'var(--yellow)'},
+    CHECK_EROSION:   {salesUp:false, ordersUp:true, label:'Check Erosion', color:'var(--blue)'},
+    DECLINE:         {salesUp:false, ordersUp:false, label:'Decline', color:'var(--red)'}
+  },
+  defaultPayrollTaxRate: 0.125
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 7 — FORMATTING UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+function fmt$(v) {
+  if (v == null || isNaN(v)) return '—';
+  const abs = Math.abs(v);
+  if (abs >= 1000) return (v < 0 ? '-' : '') + '$' + Math.round(abs).toLocaleString();
+  return (v < 0 ? '-' : '') + '$' + abs.toFixed(2);
+}
+function fmtPct(v) {
+  if (v == null || isNaN(v)) return '—';
+  return (v * 100).toFixed(1) + '%';
+}
+function fmtChg(v) {
+  if (v == null || isNaN(v)) return '—';
+  const s = (v * 100).toFixed(1);
+  return (v > 0 ? '+' : '') + s + '%';
+}
+function chgArrow(v) {
+  if (v == null || isNaN(v)) return '—';
+  if (v > 0.005) return '▲';
+  if (v < -0.005) return '▼';
+  return '—';
+}
+function chgColor(v) {
+  if (v == null || isNaN(v)) return 'var(--muted)';
+  if (v > 0.005) return 'var(--green)';
+  if (v < -0.005) return 'var(--red)';
+  return 'var(--muted)';
+}
+function signalLabel(s) {
+  const p = CONFIG.signalPatterns[s];
+  if (!p) return {label:'—', color:'var(--muted)', bgColor:'transparent'};
+  const bgMap = {'var(--green)':'var(--green-bg)','var(--red)':'var(--red-bg)','var(--yellow)':'var(--yellow-bg)','var(--blue)':'#EBF2F8'};
+  return {label:p.label, color:p.color, bgColor: bgMap[p.color]||'transparent'};
+}
+function guestScoreColor(score) {
+  if (score == null) return 'var(--muted)';
+  if (score >= CONFIG.thresholds.guestScoreGreen) return 'var(--green)';
+  if (score >= CONFIG.thresholds.guestScoreRed) return 'var(--yellow)';
+  return 'var(--red)';
+}
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v-20)%10]||s[v]||s[0]);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 8 — CHART FACTORY
+   ═══════════════════════════════════════════════════════════════════ */
+const _colorCache = {};
+function resolveColor(cssVar) {
+  if (_colorCache[cssVar]) return _colorCache[cssVar];
+  const key = cssVar.replace(/^var\(--/, '').replace(/\)$/, '');
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--' + key).trim();
+  _colorCache[cssVar] = raw || cssVar;
+  return _colorCache[cssVar];
+}
+const _charts = {};
+function destroyChart(id) { if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; } }
+
+function createTrendChart(canvasId, cfg) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  const styleMap = {solid:[], dashed:[6,4], dotted:[2,3]};
+  const datasets = cfg.datasets.map(ds => ({
+    label: ds.label,
+    data: ds.data,
+    borderColor: resolveColor(ds.color),
+    backgroundColor: resolveColor(ds.color) + '18',
+    borderWidth: ds.style === 'solid' ? 2.5 : 1.8,
+    borderDash: styleMap[ds.style] || [],
+    pointRadius: ds.style === 'solid' ? 4 : 0,
+    pointBackgroundColor: resolveColor(ds.color),
+    tension: 0.3,
+    fill: false
+  }));
+  const yFmt = cfg.yAxisFormat === 'currency' ? v => fmt$(v) :
+               cfg.yAxisFormat === 'percent' ? v => fmtPct(v) :
+               v => v?.toLocaleString();
+  _charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: cfg.labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: cfg.showLegend !== false, position:'bottom', labels:{ font:{family:'Calibri',size:11}, boxWidth:20, padding:12 } },
+        tooltip: { callbacks:{ label: c => c.dataset.label + ': ' + yFmt(c.parsed.y) } }
+      },
+      scales: {
+        x: { grid:{display:false}, ticks:{font:{family:'Calibri',size:11}} },
+        y: { grid:{color:'#E8E0D822'}, ticks:{ font:{family:'Calibri',size:11}, callback: yFmt },
+             title:{ display:!!cfg.yAxisLabel, text:cfg.yAxisLabel||'', font:{family:'Calibri',size:11} } }
+      }
+    }
+  });
+  return _charts[canvasId];
+}
+
+function createBarChart(canvasId, cfg) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  const yFmt = cfg.yAxisFormat === 'currency' ? v => fmt$(v) :
+               cfg.yAxisFormat === 'percent' ? v => fmtPct(v) :
+               v => v?.toLocaleString();
+  _charts[canvasId] = new Chart(ctx, {
+    type: cfg.horizontal ? 'bar' : 'bar',
+    data: {
+      labels: cfg.labels,
+      datasets: cfg.datasets.map(ds => ({
+        label: ds.label,
+        data: ds.data,
+        backgroundColor: ds.colors || resolveColor(ds.color || 'var(--gold)'),
+        borderRadius: 3,
+        barPercentage: 0.7
+      }))
+    },
+    options: {
+      indexAxis: cfg.horizontal ? 'y' : 'x',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: cfg.showLegend || false, position:'bottom', labels:{font:{family:'Calibri',size:11}} },
+        tooltip: { callbacks:{ label: c => c.dataset.label + ': ' + yFmt(c.parsed[cfg.horizontal?'x':'y']) } }
+      },
+      scales: {
+        x: { grid:{display:cfg.horizontal}, ticks:{font:{family:'Calibri',size:11}, callback: cfg.horizontal ? yFmt : v=>v} },
+        y: { grid:{display:!cfg.horizontal}, ticks:{font:{family:'Calibri',size:11}, callback: cfg.horizontal ? v=>v : yFmt} }
+      }
+    }
+  });
+  return _charts[canvasId];
+}
+
+function createHeatMap(canvasId, cfg) {
+  destroyChart(canvasId);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const ctx2d = canvas.getContext('2d');
+  const {rows, cols, data, cellWidth, cellHeight, format} = cfg;
+  const marginLeft = 100, marginTop = 30;
+  canvas.width = marginLeft + cols.length * cellWidth;
+  canvas.height = marginTop + rows.length * cellHeight;
+  ctx2d.font = '11px Calibri';
+  cols.forEach((c,i) => { ctx2d.fillStyle = '#8C7B6B'; ctx2d.textAlign = 'center'; ctx2d.fillText(c, marginLeft + i*cellWidth + cellWidth/2, marginTop - 8); });
+  rows.forEach((r,ri) => {
+    ctx2d.fillStyle = '#2C2420'; ctx2d.textAlign = 'right'; ctx2d.fillText(r, marginLeft - 8, marginTop + ri*cellHeight + cellHeight/2 + 4);
+    cols.forEach((c,ci) => {
+      const v = data[ri]?.[ci] ?? 0;
+      const intensity = Math.min(1, Math.max(0, v));
+      const r2 = Math.round(196 - intensity * 152), g2 = Math.round(146 + intensity * 0), b2 = Math.round(42 + intensity * 0);
+      ctx2d.fillStyle = `rgba(${196-Math.round(intensity*50)}, ${146+Math.round(intensity*50)}, ${42+Math.round(intensity*5)}, ${0.2+intensity*0.7})`;
+      ctx2d.fillRect(marginLeft + ci*cellWidth + 1, marginTop + ri*cellHeight + 1, cellWidth - 2, cellHeight - 2);
+      ctx2d.fillStyle = intensity > 0.6 ? '#fff' : '#2C2420';
+      ctx2d.textAlign = 'center';
+      const label = format === 'percent' ? fmtPct(v) : format === 'currency' ? fmt$(v) : v.toFixed(1);
+      ctx2d.fillText(label, marginLeft + ci*cellWidth + cellWidth/2, marginTop + ri*cellHeight + cellHeight/2 + 4);
+    });
+  });
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 9 — KPI TILE BUILDER
+   ═══════════════════════════════════════════════════════════════════ */
+function kpiTile(cfg) {
+  const sizeClass = cfg.size === 'large' ? ' large' : '';
+  let html = `<div class="kpi-tile${sizeClass}">`;
+  html += `<div class="kpi-label">${cfg.label}</div>`;
+  html += `<div class="kpi-value">${cfg.value}</div>`;
+  if (cfg.wowChange != null) {
+    const wLabel = cfg.wowLabel || 'WoW';
+    html += `<div class="kpi-change" style="color:${chgColor(cfg.wowChange)}">${chgArrow(cfg.wowChange)} ${fmtChg(cfg.wowChange)} ${wLabel}</div>`;
+  }
+  if (cfg.yoyChange != null) {
+    const yLabel = cfg.yoyLabel || 'vs 2025';
+    html += `<div class="kpi-change" style="color:${chgColor(cfg.yoyChange)}">${chgArrow(cfg.yoyChange)} ${fmtChg(cfg.yoyChange)} ${yLabel}</div>`;
+  }
+  if (cfg.subtitle) html += `<div class="kpi-subtitle">${cfg.subtitle}</div>`;
+  html += '</div>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 10 — SORTABLE TABLE BUILDER
+   ═══════════════════════════════════════════════════════════════════ */
+const _tableSorts = {};
+function sortableTable(cfg) {
+  const tid = cfg.id || 'tbl-' + Math.random().toString(36).slice(2,8);
+  if (!_tableSorts[tid]) _tableSorts[tid] = cfg.defaultSort || {key:cfg.headers[0]?.key, dir:'asc'};
+  const sort = _tableSorts[tid];
+  let rows = [...cfg.rows];
+  if (sort.key) {
+    rows.sort((a,b) => {
+      let va = a[sort.key], vb = b[sort.key];
+      if (va == null) va = -Infinity; if (vb == null) vb = -Infinity;
+      if (typeof va === 'string') return sort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      return sort.dir === 'asc' ? va - vb : vb - va;
+    });
+  }
+  function fmtCell(val, format) {
+    if (val == null) return '—';
+    switch(format) {
+      case 'currency': return fmt$(val);
+      case 'changePct': return `<span style="color:${chgColor(val)}">${chgArrow(val)} ${fmtChg(val)}</span>`;
+      case 'percent': return fmtPct(val);
+      case 'number': return typeof val === 'number' ? val.toLocaleString() : val;
+      case 'score': return `<span style="color:${guestScoreColor(val)};font-weight:700">${val}</span>`;
+      case 'rank': return ordinal(val);
+      case 'signal': { const s = signalLabel(val); return `<span style="color:${s.color};background:${s.bgColor};padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600">${s.label}</span>`; }
+      default: return val;
+    }
+  }
+  let html = `<div class="table-wrap"><table class="data-table" id="${tid}"><thead><tr>`;
+  cfg.headers.forEach(h => {
+    const arrow = sort.key === h.key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    const sortAttr = h.sortable !== false ? ` onclick="tableSort('${tid}','${h.key}')"` : '';
+    const w = h.width ? ` style="width:${h.width}${h.align ? ';text-align:'+h.align : ''}"` : (h.align ? ` style="text-align:${h.align}"` : '');
+    html += `<th${w}${sortAttr}>${h.label}${arrow}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  if (cfg.groupBy && cfg.groupOrder) {
+    cfg.groupOrder.forEach(g => {
+      html += `<tr class="group-header"><td colspan="${cfg.headers.length}">${g}</td></tr>`;
+      rows.filter(r => r[cfg.groupBy] === g).forEach(r => { html += renderRow(r, cfg, tid); });
+    });
+  } else {
+    rows.forEach(r => { html += renderRow(r, cfg, tid); });
+  }
+  html += '</tbody></table></div>';
+  return html;
+
+  function renderRow(r, cfg, tid) {
+    const hl = cfg.highlightRow && cfg.highlightRow(r) ? ' class="highlight"' : '';
+    const click = cfg.onRowClick ? ` onclick="${cfg.onRowClick.name}('${r.store||r.name||''}')" style="cursor:pointer"` : '';
+    let row = `<tr${hl}${click}>`;
+    cfg.headers.forEach(h => {
+      const align = h.align ? ` style="text-align:${h.align}"` : '';
+      row += `<td${align}>${fmtCell(r[h.key], h.format)}</td>`;
+    });
+    row += '</tr>';
+    return row;
+  }
+}
+function tableSort(tid, key) {
+  const s = _tableSorts[tid];
+  if (s.key === key) s.dir = s.dir === 'asc' ? 'desc' : 'asc';
+  else { s.key = key; s.dir = 'asc'; }
+  renderTab();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 5 — EXCEL PARSER
+   ═══════════════════════════════════════════════════════════════════ */
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      parseWorkbook(wb);
+    } catch(err) {
+      document.getElementById('content').innerHTML = `<div class="card" style="color:var(--red)">Error parsing file: ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseWorkbook(wb) {
+  const requiredTabs = ['Weekly_Fact_Table','Budget_Fact_Table','Brand_Weekly_History','Prior_Year_Fact_Table','Store_List','Fiscal_Calendar'];
+  const optionalTabs = ['Seasonality_Index','Channel_Seasonality_Index','Brink_Pmix_Import_2026','Brink_Pmix_Import_2025','Brink_Pmix_Weekly_2026','Brink_Pmix_Weekly_2025','Store_Salary'];
+  const found = wb.SheetNames;
+  const missing = requiredTabs.filter(t => !found.includes(t));
+  if (missing.length) { document.getElementById('content').innerHTML = `<div class="card" style="color:var(--red)">Missing required tabs: ${missing.join(', ')}</div>`; return; }
+
+  function sheet(name) {
+    if (!found.includes(name)) return [];
+    return XLSX.utils.sheet_to_json(wb.Sheets[name]).map(row => {
+      const clean = {};
+      Object.keys(row).forEach(k => { clean[k.trim()] = row[k]; });
+      return clean;
+    });
+  }
+  function num(v) { return typeof v === 'number' ? v : (parseFloat(v) || 0); }
+  function numOrNull(v) { return v == null || v === '' ? null : (typeof v === 'number' ? v : parseFloat(v)); }
+  function cleanCurrency(v) {
+    if (v == null) return 0;
+    if (typeof v === 'number') return v;
+    return parseFloat(String(v).replace(/[$,\u00a0\s]/g, '')) || 0;
+  }
+  function trim(v) { return v == null ? '' : String(v).trim(); }
+
+  // Feature flags
+  S.features.hasSeasonality = found.includes('Seasonality_Index') && sheet('Seasonality_Index').length > 0;
+  S.features.hasChannelSeasonality = found.includes('Channel_Seasonality_Index') && sheet('Channel_Seasonality_Index').length > 0;
+  S.features.hasPmixWeekly = found.includes('Brink_Pmix_Weekly_2026') && found.includes('Brink_Pmix_Weekly_2025') && sheet('Brink_Pmix_Weekly_2026').length > 0 && sheet('Brink_Pmix_Weekly_2025').length > 0;
+  S.features.hasSalary = found.includes('Store_Salary') && sheet('Store_Salary').some(r => r.Period_Salary != null);
+
+  // Weekly_Fact_Table
+  S.data.weekly = sheet('Weekly_Fact_Table').map(r => ({
+    weekEnd: r.Week_End, fw: num(r.Fiscal_Week), store: trim(r.Store_Name),
+    type: trim(r.Analysis_Type), cat: trim(r.Category),
+    sales: num(r.Sales), orders: num(r.Orders), avgCheck: num(r.Avg_Check),
+    reviews: num(r.Reviews), costPct: numOrNull(r['Cost %']),
+    avgRating: numOrNull(r.Avg_Rating),
+    responseRate: (() => { const v = numOrNull(r.Response_Rate); return v != null && v > 1 ? v / 100 : v; })(),
+    hoursWorked: numOrNull(r.Hours_Worked)
+  }));
+  S.data.availableWeeks = [...new Set(S.data.weekly.map(r=>r.fw))].sort((a,b)=>a-b);
+  S.week = Math.max(...S.data.availableWeeks);
+
+  // Budget_Fact_Table
+  S.data.budget = sheet('Budget_Fact_Table').map(r => ({
+    period: num(r.Fiscal_Period), store: trim(r.Store),
+    budgetSales: num(r.Budget_Sales), budgetEbitdaPct: num(r.Budget_EBITDA_Pct),
+    budgetFoodCostPct: num(r.Budget_Food_Cost_Pct), budgetLaborPct: num(r.Budget_Labor_Pct),
+    budgetAllInLaborPct: num(r.Budget_All_In_Labor_Pct)
+  }));
+
+  // Brand_Weekly_History
+  S.data.brandHistory = sheet('Brand_Weekly_History').map(r => ({
+    weekEnd: r.Week_End, fiscalYear: num(r.Fiscal_Year), period: trim(r.Fiscal_Period),
+    fw: num(r.Fiscal_Week), type: trim(r.Analysis_Type), cat: trim(r.Category),
+    sales: num(r.Sales), orders: num(r.Orders)
+  }));
+
+  // Seasonality
+  if (S.features.hasSeasonality) {
+    S.data.seasonality = sheet('Seasonality_Index').map(r => ({
+      fw: num(r.Fiscal_Week), period: trim(r.Fiscal_Period),
+      salesIndex: num(r.Sales_Index), ordersIndex: num(r.Orders_Index),
+      yearsInSample: num(r.Years_In_Sample)
+    }));
+  }
+  if (S.features.hasChannelSeasonality) {
+    S.data.channelSeasonality = sheet('Channel_Seasonality_Index').map(r => ({
+      fw: num(r.Fiscal_Week), period: trim(r.Fiscal_Period), channel: trim(r.Channel),
+      salesIndex: num(r.Sales_Index), ordersIndex: num(r.Orders_Index),
+      yearsInSample: num(r.Years_In_Sample)
+    }));
+  }
+
+  // PMIX Period
+  S.data.pmixPeriod2026 = sheet('Brink_Pmix_Import_2026').map(r => ({
+    period: trim(r.Period), item: trim(r['Item Name']),
+    qty: num(r.Quantity), avgPrice: num(r['Average Price']),
+    totalSales: num(r['Total Sales']), pct: num(r.Percent)
+  }));
+  S.data.pmixPeriod2025 = sheet('Brink_Pmix_Import_2025').map(r => ({
+    period: trim(r.Period), item: trim(r['Item Name']),
+    qty: num(r.Quantity), avgPrice: cleanCurrency(r['Average Price']),
+    totalSales: cleanCurrency(r['Total Sales']), pct: num(r.Percent)
+  }));
+
+  // PMIX Weekly
+  if (S.features.hasPmixWeekly) {
+    S.data.pmixWeekly2026 = sheet('Brink_Pmix_Weekly_2026').map(r => ({
+      fiscalYear: num(r['Fiscal Year']), period: num(r['Fiscal Period']),
+      fw: num(r.Fiscal_Week), weekEnd: r['Week End'], item: trim(r['Item Name']),
+      qty: num(r.Quantity), avgPrice: num(r['Average Price']),
+      totalSales: num(r['Total Sales']), pct: num(r.Percent)
+    }));
+    S.data.pmixWeekly2025 = sheet('Brink_Pmix_Weekly_2025').map(r => ({
+      fiscalYear: num(r['Fiscal Year']), period: num(r['Fiscal Period']),
+      fw: num(r.Fiscal_Week), weekEnd: r['Week End'], item: trim(r['Item Name']),
+      qty: num(r.Quantity), avgPrice: num(r['Average Price']),
+      totalSales: num(r['Total Sales']), pct: num(r.Percent)
+    }));
+  }
+
+  // Prior Year
+  S.data.priorYear = sheet('Prior_Year_Fact_Table').map(r => ({
+    period: num(r.Fiscal_Period), fiscalYear: num(r.Fiscal_Year),
+    store: trim(r.Store), type: trim(r.Analysis_Type), cat: trim(r.Category),
+    sales: num(r.Sales), orders: num(r.Orders), avgCheck: num(r.Avg_Check)
+  }));
+
+  // Store_List
+  S.data.stores = sheet('Store_List').map(r => ({
+    storeNumber: trim(r.Store_Number), name: trim(r.Store_Name), district: trim(r.District)
+  }));
+  // Update CONFIG districts from Excel
+  const excelDistricts = {};
+  S.data.stores.forEach(s => {
+    if (!excelDistricts[s.district]) excelDistricts[s.district] = [];
+    excelDistricts[s.district].push(s.name);
+  });
+  if (Object.keys(excelDistricts).length) CONFIG.districts = excelDistricts;
+
+  // Fiscal_Calendar
+  S.data.calendar = sheet('Fiscal_Calendar').map(r => ({
+    period: trim(r.Period), week: num(r.Week), start: r.Start, end: r.End, fiscalYear: num(r.Fiscal_Year)
+  }));
+  const cal2026 = S.data.calendar.filter(r => r.fiscalYear === 2026);
+  const wtp = {};
+  cal2026.forEach(r => { wtp[r.week] = r.period; });
+  S.data.weekToPeriod = wtp;
+  S.data.availablePeriods = [...new Set(cal2026.map(r=>r.period))].sort((a,b) => {
+    const na = parseInt(a.replace('P','')), nb = parseInt(b.replace('P',''));
+    return na - nb;
+  });
+  S.data.currentPeriod = wtp[S.week] || S.data.availablePeriods[S.data.availablePeriods.length-1] || 'P1';
+  S.menuPeriod = S.data.currentPeriod;
+
+  // Store_Salary
+  if (S.features.hasSalary) {
+    const raw = sheet('Store_Salary');
+    S.data.salary = raw.map(r => ({
+      store: trim(r.Store_Name), period: num(r.Fiscal_Period),
+      periodSalary: numOrNull(r.Period_Salary), payrollTax: numOrNull(r.Payroll_Tax)
+    }));
+  }
+
+  // Show validation then compute
+  showValidation(found);
+  computeAll();
+
+  // Show UI
+  uploadZone.classList.add('hidden');
+  document.getElementById('reloadBtn').style.display = 'inline-block';
+  document.getElementById('districtFilter').style.display = 'flex';
+  document.getElementById('weekSelectWrap').style.display = 'flex';
+  document.getElementById('tabBar').style.display = 'flex';
+
+  // Populate week selector
+  const sel = document.getElementById('weekSelect');
+  sel.innerHTML = '';
+  S.data.availableWeeks.slice().reverse().forEach(w => {
+    const per = S.data.weekToPeriod[w] || '';
+    sel.innerHTML += `<option value="${w}" ${w===S.week?'selected':''}>${per} — W${w}</option>`;
+  });
+
+  // Auto-render after validation flash
+  setTimeout(() => renderTab(), 2500);
+}
+
+function showValidation(found) {
+  const allTabs = ['Weekly_Fact_Table','Budget_Fact_Table','Brand_Weekly_History','Prior_Year_Fact_Table','Store_List','Fiscal_Calendar','Seasonality_Index','Channel_Seasonality_Index','Brink_Pmix_Import_2026','Brink_Pmix_Import_2025','Brink_Pmix_Weekly_2026','Brink_Pmix_Weekly_2025','Store_Salary'];
+  const storeNames = [...new Set(S.data.weekly.map(r=>r.store))];
+  const weeks = S.data.availableWeeks;
+  let html = '<div class="validation-summary">';
+  html += '<h3>Data Loaded Successfully</h3>';
+  html += '<div class="row"><span class="label">Tabs Found</span><span class="value">' + allTabs.map(t => found.includes(t) ? '✓ ' + t : '✗ ' + t).join('<br>') + '</span></div>';
+  html += `<div class="row"><span class="label">Weekly_Fact_Table</span><span class="value">${S.data.weekly.length} rows, ${storeNames.length} stores, W${weeks[0]}–W${weeks[weeks.length-1]}</span></div>`;
+  html += `<div class="row"><span class="label">Features</span><span class="value">Seasonality: ${S.features.hasSeasonality?'✓':'✗'} | Channel Seasonality: ${S.features.hasChannelSeasonality?'✓':'✗'} | Weekly PMIX: ${S.features.hasPmixWeekly?'✓':'✗'} | Salary: ${S.features.hasSalary?'P1 only':'✗'}</span></div>`;
+  if (S.features.hasSalary) {
+    html += '<div class="row"><span class="label warn">⚠ Note</span><span class="value">Store_Salary: only P1 populated — using P1 values for all periods</span></div>';
+  }
+  html += '</div>';
+  document.getElementById('content').innerHTML = html;
+}
+
+function resetUpload() {
+  uploadZone.classList.remove('hidden');
+  document.getElementById('autoLoadMsg').style.display = 'none';
+  document.getElementById('manualUpload').style.display = 'none';
+  document.getElementById('reloadBtn').style.display = 'none';
+  document.getElementById('districtFilter').style.display = 'none';
+  document.getElementById('weekSelectWrap').style.display = 'none';
+  document.getElementById('tabBar').style.display = 'none';
+  document.getElementById('content').innerHTML = '';
+  autoFetchData();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 6 — COMPUTE ENGINE
+   ═══════════════════════════════════════════════════════════════════ */
+function computeAll() {
+  const C = S.computed = {};
+  const allStores = S.data.stores.map(s=>s.name);
+  const weeks = S.data.availableWeeks;
+  const curPeriod = S.data.currentPeriod;
+  const curPeriodNum = parseInt(curPeriod.replace('P',''));
+  const periodWeeks = weeks.filter(w => S.data.weekToPeriod[w] === curPeriod);
+  const weeksElapsed = periodWeeks.length;
+  const totalPeriodWeeks = CONFIG.weeksPerPeriod;
+
+  // Helper: filter weekly rows
+  function wRows(store, fw, type) {
+    return S.data.weekly.filter(r => r.store === store && r.fw === fw && r.type === type);
+  }
+  function sumField(arr, field) { return arr.reduce((s,r) => s + (r[field]||0), 0); }
+
+  // ── 6A: Store Totals ──
+  C.storeTotals = {};
+  allStores.forEach(store => {
+    C.storeTotals[store] = {};
+    weeks.forEach(fw => {
+      const destRows = wRows(store, fw, 'Destination');
+      const sales = sumField(destRows, 'sales');
+      const orders = sumField(destRows, 'orders');
+      const avgCheck = orders > 0 ? sales / orders : 0;
+
+      // WoW
+      const priorFw = fw - 1;
+      let salesWoW = null, ordersWoW = null, checkWoW = null;
+      let trafficContrib = null, checkContrib = null;
+      if (C.storeTotals[store][priorFw]) {
+        const p = C.storeTotals[store][priorFw];
+        salesWoW = p.sales > 0 ? (sales - p.sales) / p.sales : null;
+        ordersWoW = p.orders > 0 ? (orders - p.orders) / p.orders : null;
+        checkWoW = p.avgCheck > 0 ? (avgCheck - p.avgCheck) / p.avgCheck : null;
+        // Decomposition
+        if (p.sales > 0) {
+          const trafficEffect = (orders - p.orders) * p.avgCheck;
+          const checkEffect = (avgCheck - p.avgCheck) * p.orders;
+          const mixEffect = (orders - p.orders) * (avgCheck - p.avgCheck);
+          const totalChange = sales - p.sales;
+          trafficContrib = totalChange !== 0 ? (trafficEffect + mixEffect/2) / totalChange : 0;
+          checkContrib = totalChange !== 0 ? (checkEffect + mixEffect/2) / totalChange : 0;
+        }
+      }
+
+      // YoY (store-level: use prior year period-prorated)
+      let salesYoY = null, ordersYoY = null, checkYoY = null;
+      const pyRows = S.data.priorYear.filter(r => r.store === store && r.period === curPeriodNum && r.type === 'Destination');
+      if (pyRows.length) {
+        const pySales = sumField(pyRows, 'sales');
+        const pyOrders = sumField(pyRows, 'orders');
+        const pyWeekAvgSales = pySales / totalPeriodWeeks;
+        const pyWeekAvgOrders = pyOrders / totalPeriodWeeks;
+        if (pyWeekAvgSales > 0) salesYoY = (sales - pyWeekAvgSales) / pyWeekAvgSales;
+        if (pyWeekAvgOrders > 0) ordersYoY = (orders - pyWeekAvgOrders) / pyWeekAvgOrders;
+        const pyCheck = pyOrders > 0 ? pySales / pyOrders : 0;
+        if (pyCheck > 0) checkYoY = (avgCheck - pyCheck) / pyCheck;
+      }
+
+      // Signal
+      let signal = 'DECLINE';
+      if (salesWoW != null && ordersWoW != null) {
+        const su = salesWoW > 0.005, ou = ordersWoW > 0.005;
+        if (su && ou) signal = 'BALANCED_GROWTH';
+        else if (su && !ou) signal = 'CHECK_INFLATION';
+        else if (!su && ou) signal = 'CHECK_EROSION';
+      }
+
+      C.storeTotals[store][fw] = {sales, orders, avgCheck, salesWoW, ordersWoW, checkWoW, salesYoY, ordersYoY, checkYoY, signal, trafficContrib, checkContrib};
+    });
+  });
+
+  // ── 6B: Brand Totals ──
+  C.brandTotals = {};
+  weeks.forEach(fw => {
+    let sales=0, orders=0;
+    allStores.forEach(store => {
+      const st = C.storeTotals[store]?.[fw];
+      if (st) { sales += st.sales; orders += st.orders; }
+    });
+    const avgCheck = orders > 0 ? sales / orders : 0;
+    const priorFw = fw - 1;
+    let salesWoW=null, ordersWoW=null, checkWoW=null, trafficContrib=null, checkContrib=null;
+    if (C.brandTotals[priorFw]) {
+      const p = C.brandTotals[priorFw];
+      salesWoW = p.sales > 0 ? (sales - p.sales) / p.sales : null;
+      ordersWoW = p.orders > 0 ? (orders - p.orders) / p.orders : null;
+      checkWoW = p.avgCheck > 0 ? (avgCheck - p.avgCheck) / p.avgCheck : null;
+      if (p.sales > 0) {
+        const te = (orders-p.orders)*p.avgCheck, ce = (avgCheck-p.avgCheck)*p.orders, me = (orders-p.orders)*(avgCheck-p.avgCheck);
+        const tc = sales - p.sales;
+        trafficContrib = tc !== 0 ? (te+me/2)/tc : 0;
+        checkContrib = tc !== 0 ? (ce+me/2)/tc : 0;
+      }
+    }
+    // YoY from Brand History
+    const bh25 = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination');
+    const sales2025 = sumField(bh25, 'sales'), orders2025 = sumField(bh25, 'orders');
+    const check2025 = orders2025 > 0 ? sales2025 / orders2025 : 0;
+    const salesYoY = sales2025 > 0 ? (sales - sales2025) / sales2025 : null;
+    const ordersYoY = orders2025 > 0 ? (orders - orders2025) / orders2025 : null;
+    const checkYoY = check2025 > 0 ? (avgCheck - check2025) / check2025 : null;
+    let signal = 'DECLINE';
+    if (salesWoW != null && ordersWoW != null) {
+      const su = salesWoW > 0.005, ou = ordersWoW > 0.005;
+      if (su && ou) signal = 'BALANCED_GROWTH'; else if (su && !ou) signal = 'CHECK_INFLATION'; else if (!su && ou) signal = 'CHECK_EROSION';
+    }
+    C.brandTotals[fw] = {sales, orders, avgCheck, salesWoW, ordersWoW, checkWoW, signal, trafficContrib, checkContrib, sales2025, orders2025, check2025, salesYoY, ordersYoY, checkYoY};
+  });
+
+  // ── 6C: District Totals ──
+  C.districtTotals = {};
+  Object.keys(CONFIG.districts).forEach(dist => {
+    C.districtTotals[dist] = {};
+    const dStores = CONFIG.districts[dist];
+    weeks.forEach(fw => {
+      let sales=0, orders=0;
+      dStores.forEach(store => {
+        const st = C.storeTotals[store]?.[fw];
+        if (st) { sales += st.sales; orders += st.orders; }
+      });
+      const avgCheck = orders > 0 ? sales / orders : 0;
+      const priorFw = fw - 1;
+      let salesWoW=null, ordersWoW=null, checkWoW=null;
+      if (C.districtTotals[dist][priorFw]) {
+        const p = C.districtTotals[dist][priorFw];
+        salesWoW = p.sales > 0 ? (sales-p.sales)/p.sales : null;
+        ordersWoW = p.orders > 0 ? (orders-p.orders)/p.orders : null;
+        checkWoW = p.avgCheck > 0 ? (avgCheck-p.avgCheck)/p.avgCheck : null;
+      }
+      let signal = 'DECLINE';
+      if (salesWoW != null && ordersWoW != null) {
+        const su = salesWoW > 0.005, ou = ordersWoW > 0.005;
+        if (su && ou) signal = 'BALANCED_GROWTH'; else if (su && !ou) signal = 'CHECK_INFLATION'; else if (!su && ou) signal = 'CHECK_EROSION';
+      }
+      C.districtTotals[dist][fw] = {sales, orders, avgCheck, salesWoW, ordersWoW, checkWoW, signal};
+    });
+  });
+
+  // ── 6D: Channel Breakdown ──
+  C.channels = {};
+  weeks.forEach(fw => {
+    const dest = {}, dayp = {};
+    const fwRows = S.data.weekly.filter(r => r.fw === fw);
+    const destRows = fwRows.filter(r => r.type === 'Destination');
+    const dayRows = fwRows.filter(r => r.type === 'Daypart');
+    const totalOrders = destRows.reduce((s,r) => s + r.orders, 0);
+    CONFIG.destinationChannels.forEach(ch => {
+      const chRows = destRows.filter(r => r.cat === ch);
+      const sales = sumField(chRows,'sales'), orders = sumField(chRows,'orders');
+      const avgCheck = orders > 0 ? sales/orders : 0;
+      const shareOfOrders = totalOrders > 0 ? orders/totalOrders : 0;
+      // WoW
+      let salesWoW=null, ordersWoW=null, checkWoW=null;
+      if (C.channels[fw-1]?.destination?.[ch]) {
+        const p = C.channels[fw-1].destination[ch];
+        salesWoW = p.sales>0 ? (sales-p.sales)/p.sales : null;
+        ordersWoW = p.orders>0 ? (orders-p.orders)/p.orders : null;
+        checkWoW = p.avgCheck>0 ? (avgCheck-p.avgCheck)/p.avgCheck : null;
+      }
+      dest[ch] = {sales, orders, avgCheck, shareOfOrders, salesWoW, ordersWoW, checkWoW};
+    });
+    CONFIG.allDayparts.forEach(dp => {
+      const dpRows = dayRows.filter(r => r.cat === dp);
+      const sales = sumField(dpRows,'sales'), orders = sumField(dpRows,'orders');
+      const avgCheck = orders > 0 ? sales/orders : 0;
+      const shareOfOrders = totalOrders > 0 ? orders/totalOrders : 0;
+      let salesWoW=null, ordersWoW=null;
+      if (C.channels[fw-1]?.daypart?.[dp]) {
+        const p = C.channels[fw-1].daypart[dp];
+        salesWoW = p.sales>0 ? (sales-p.sales)/p.sales : null;
+        ordersWoW = p.orders>0 ? (orders-p.orders)/p.orders : null;
+      }
+      dayp[dp] = {sales, orders, avgCheck, shareOfOrders, salesWoW, ordersWoW};
+    });
+    C.channels[fw] = {destination:dest, daypart:dayp};
+  });
+
+  // ── 6E: Store Channel Breakdown ──
+  C.storeChannels = {};
+  allStores.forEach(store => {
+    C.storeChannels[store] = {};
+    weeks.forEach(fw => {
+      const dest = {}, dayp = {};
+      const fwRows = S.data.weekly.filter(r => r.fw===fw && r.store===store);
+      const destRows = fwRows.filter(r => r.type==='Destination');
+      const dayRows = fwRows.filter(r => r.type==='Daypart');
+      const storeChange = C.storeTotals[store][fw]?.sales - (C.storeTotals[store][fw-1]?.sales || 0);
+      CONFIG.destinationChannels.forEach(ch => {
+        const chRows = destRows.filter(r => r.cat===ch);
+        const sales = sumField(chRows,'sales'), orders = sumField(chRows,'orders');
+        let salesWoW=null, ordersWoW=null;
+        const priorStore = C.storeChannels[store]?.[fw-1];
+        if (priorStore?.destination?.[ch]) {
+          const p = priorStore.destination[ch];
+          salesWoW = p.sales>0 ? (sales-p.sales)/p.sales : null;
+          ordersWoW = p.orders>0 ? (orders-p.orders)/p.orders : null;
+        }
+        const chChange = sales - (priorStore?.destination?.[ch]?.sales || sales);
+        const contributionToStoreChange = storeChange !== 0 ? chChange / storeChange : 0;
+        dest[ch] = {sales, orders, salesWoW, ordersWoW, contributionToStoreChange};
+      });
+      CONFIG.allDayparts.forEach(dp => {
+        const dpRows = dayRows.filter(r => r.cat===dp);
+        const sales = sumField(dpRows,'sales'), orders = sumField(dpRows,'orders');
+        dayp[dp] = {sales, orders};
+      });
+      C.storeChannels[store][fw] = {destination:dest, daypart:dayp};
+    });
+  });
+
+  // ── 6F: Guest Health Scores ──
+  C.guestHealth = {};
+  function interpolate(value, anchors) {
+    if (value <= anchors[0].value) return anchors[0].score;
+    if (value >= anchors[anchors.length-1].value) return anchors[anchors.length-1].score;
+    for (let i = 0; i < anchors.length - 1; i++) {
+      if (value >= anchors[i].value && value <= anchors[i+1].value) {
+        const pct = (value - anchors[i].value) / (anchors[i+1].value - anchors[i].value);
+        return anchors[i].score + pct * (anchors[i+1].score - anchors[i].score);
+      }
+    }
+    return 0;
+  }
+  allStores.forEach(store => {
+    C.guestHealth[store] = {};
+    weeks.forEach(fw => {
+      const revRows = S.data.weekly.filter(r => r.fw===fw && r.store===store && r.type==='Reviews');
+      const ratingRow = revRows.find(r => r.cat==='Avg Rating');
+      const lowRow = revRows.find(r => r.cat==='1-3 stars');
+      const totalRow = revRows.find(r => r.cat==='Total Reviews');
+      const respRow = revRows.find(r => r.cat==='Response Rate');
+      const avgRating = ratingRow?.avgRating ?? 0;
+      const lowReviews = lowRow?.reviews ?? 0;
+      const totalReviews = totalRow?.reviews ?? 0;
+      const responseRate = respRow?.responseRate ?? 0;
+      if (avgRating === 0 && totalReviews === 0) { C.guestHealth[store][fw] = null; return; }
+      const lowPct = totalReviews > 0 ? lowReviews / totalReviews : 0;
+      const ratingScore = interpolate(avgRating, CONFIG.ratingAnchors);
+      const lowPctScore = interpolate(lowPct, CONFIG.lowPctAnchors);
+      const responseScore = lowReviews === 0 ? 10 : interpolate(responseRate, CONFIG.responseAnchors);
+      const volumeBonus = totalReviews >= CONFIG.volumeBonusMedian * 0.5 ?
+        Math.min(CONFIG.volumeBonusMax, (totalReviews / CONFIG.volumeBonusMedian) * CONFIG.volumeBonusMax) : 0;
+      const rawTotal = ratingScore + lowPctScore + responseScore + volumeBonus;
+      const raw = Math.round(rawTotal / 95 * 100);
+      C.guestHealth[store][fw] = {
+        raw, smoothed: raw, ptd: raw,
+        components: {ratingScore, lowPctScore, responseScore, volumeBonus},
+        data: {avgRating, lowReviews, totalReviews, lowPct, responseRate}
+      };
+    });
+    // Smoothing
+    weeks.forEach(fw => {
+      if (!C.guestHealth[store][fw]) return;
+      const vals = [], wts = [];
+      for (let i = 0; i < 3; i++) {
+        const g = C.guestHealth[store][fw - i];
+        if (g) { vals.push(g.raw); wts.push(CONFIG.smoothingWeights[i]); }
+      }
+      if (vals.length) {
+        const totalW = wts.reduce((a,b)=>a+b,0);
+        C.guestHealth[store][fw].smoothed = Math.round(vals.reduce((s,v,i) => s + v * wts[i], 0) / totalW);
+      }
+    });
+    // PTD
+    const ptdWeeks = weeks.filter(w => S.data.weekToPeriod[w] === curPeriod);
+    const ptdScores = ptdWeeks.map(w => C.guestHealth[store][w]?.raw).filter(v => v != null);
+    const ptd = ptdScores.length ? Math.round(ptdScores.reduce((a,b)=>a+b,0) / ptdScores.length) : null;
+    ptdWeeks.forEach(w => { if (C.guestHealth[store][w]) C.guestHealth[store][w].ptd = ptd; });
+  });
+
+  // ── 6H: Budget Pacing ──
+  C.budgetPacing = {};
+  allStores.forEach(store => {
+    const budgetRow = S.data.budget.find(b => b.store === store && b.period === curPeriodNum);
+    const ptdSales = periodWeeks.reduce((s,w) => s + (C.storeTotals[store][w]?.sales || 0), 0);
+    const periodBudget = budgetRow?.budgetSales || 0;
+    const variance = ptdSales - periodBudget * (weeksElapsed / totalPeriodWeeks);
+    const variancePct = periodBudget > 0 ? variance / (periodBudget * (weeksElapsed / totalPeriodWeeks)) : 0;
+    const weeksRemaining = totalPeriodWeeks - weeksElapsed;
+    const weeklyRunRateNeeded = weeksRemaining > 0 ? (periodBudget - ptdSales) / weeksRemaining : 0;
+    const onPace = ptdSales >= (periodBudget / totalPeriodWeeks * weeksElapsed);
+    // Prior year PTD
+    const pyRows = S.data.priorYear.filter(r => r.store===store && r.period===curPeriodNum && r.type==='Destination');
+    const pyTotal = sumField(pyRows, 'sales');
+    const priorYearPTD = pyTotal * (weeksElapsed / totalPeriodWeeks);
+    C.budgetPacing[store] = {period:curPeriod, ptdSales, periodBudget, variance, variancePct, weeksElapsed, weeksRemaining, weeklyRunRateNeeded, onPace, priorYearPTD};
+  });
+
+  // ── 6I: Controllable Costs ──
+  C.costs = {};
+  allStores.forEach(store => {
+    C.costs[store] = {};
+    const budgetRow = S.data.budget.find(b => b.store===store && b.period===curPeriodNum);
+    weeks.forEach(fw => {
+      const costRows = S.data.weekly.filter(r => r.fw===fw && r.store===store && r.type==='Controllable Cost');
+      const foodRow = costRows.find(r => r.cat==='Food Cost');
+      const laborRow = costRows.find(r => r.cat==='Labor Cost');
+      const hoursRow = costRows.find(r => r.cat==='Hours Worked');
+      const foodCostPct = foodRow?.costPct ?? null;
+      const laborCostPct = laborRow?.costPct ?? null;
+      const hoursWorked = hoursRow?.hoursWorked ?? null;
+      const storeSales = C.storeTotals[store][fw]?.sales || 0;
+      const splh = hoursWorked > 0 ? storeSales / hoursWorked : null;
+      const bfcp = budgetRow?.budgetFoodCostPct ?? null;
+      const blp = budgetRow?.budgetLaborPct ?? null;
+      const bailp = budgetRow?.budgetAllInLaborPct ?? null;
+      const foodCostVariancePct = (foodCostPct != null && bfcp != null) ? foodCostPct - bfcp : null;
+      const foodCostVarianceDollars = (foodCostVariancePct != null) ? foodCostVariancePct * storeSales : null;
+      const laborCostVariancePct = (laborCostPct != null && blp != null) ? laborCostPct - blp : null;
+      const laborCostVarianceDollars = (laborCostVariancePct != null) ? laborCostVariancePct * storeSales : null;
+      C.costs[store][fw] = {foodCostPct, laborCostPct, hoursWorked, splh, budgetFoodCostPct:bfcp, budgetLaborPct:blp, budgetAllInLaborPct:bailp, foodCostVariancePct, foodCostVarianceDollars, laborCostVariancePct, laborCostVarianceDollars};
+    });
+  });
+
+  // ── 6G: Composite Rankings ──
+  C.rankings = {};
+  weeks.forEach(fw => {
+    const ranked = allStores.map(store => {
+      const st = C.storeTotals[store][fw];
+      if (!st) return {store, district: storeDistrict(store), compositeScore:0, rank:99, dimensions:{}};
+
+      // Sales Momentum (0-20)
+      let smWoW = 0;
+      if (st.salesWoW != null) smWoW = interpLinear(st.salesWoW, [[-0.10,0],[-0.05,3],[0,6],[0.05,9],[0.10,12]]);
+      let smTrend = 0;
+      let consUp = 0;
+      for (let i = 0; i < 3; i++) {
+        const prev = C.storeTotals[store][fw-i];
+        if (prev && prev.salesWoW > 0.005) consUp++; else break;
+      }
+      if (consUp >= 3) smTrend = 8; else if (consUp >= 2) smTrend = 5; else if (consUp >= 1) smTrend = 3;
+      const salesMomentum = Math.min(20, smWoW + smTrend);
+
+      // Traffic Direction (0-25)
+      let tdWoW = 0;
+      if (st.ordersWoW != null) tdWoW = interpLinear(st.ordersWoW, [[-0.10,0],[-0.05,3],[0,7.5],[0.05,11],[0.10,15]]);
+      let consOrderUp = 0;
+      for (let i = 0; i < 3; i++) {
+        const prev = C.storeTotals[store][fw-i];
+        if (prev && prev.ordersWoW > 0.005) consOrderUp++; else break;
+      }
+      let tdCons = 0;
+      if (consOrderUp >= 3) tdCons = 10; else if (consOrderUp >= 2) tdCons = 7; else if (consOrderUp >= 1) tdCons = 4;
+      const trafficDirection = Math.min(25, Math.max(0, tdWoW + tdCons));
+
+      // Cost Discipline (0-20)
+      const cost = C.costs[store][fw];
+      let foodPts = 10, laborPts = 10;
+      if (cost?.foodCostPct != null && cost.budgetFoodCostPct != null) {
+        const overBudget = cost.foodCostPct - cost.budgetFoodCostPct;
+        foodPts = overBudget <= 0 ? 10 : Math.max(0, 10 - overBudget * 100 * 3);
+      }
+      if (cost?.laborCostPct != null && cost.budgetAllInLaborPct != null) {
+        const overBudget = cost.laborCostPct - cost.budgetAllInLaborPct;
+        laborPts = overBudget <= 0 ? 10 : Math.max(0, 10 - overBudget * 100 * 3);
+      }
+      const costDiscipline = Math.min(20, foodPts + laborPts);
+
+      // Guest Health (0-15)
+      const gh = C.guestHealth[store][fw];
+      const guestHealthScore = gh ? Math.round(gh.smoothed / 100 * 15) : 8;
+
+      // Budget Pace (0-20)
+      const bp = C.budgetPacing[store];
+      let budgetPace = 20;
+      if (bp && bp.periodBudget > 0) {
+        const paceRatio = bp.ptdSales / (bp.periodBudget / totalPeriodWeeks * weeksElapsed);
+        if (paceRatio < 1) budgetPace = Math.max(0, 20 - (1 - paceRatio) * 100);
+      }
+
+      const compositeScore = Math.round(salesMomentum + trafficDirection + costDiscipline + guestHealthScore + budgetPace);
+      return {store, district: storeDistrict(store), compositeScore, dimensions: {salesMomentum:Math.round(salesMomentum), trafficDirection:Math.round(trafficDirection), costDiscipline:Math.round(costDiscipline), guestHealth:guestHealthScore, budgetPace:Math.round(budgetPace)}};
+    });
+    ranked.sort((a,b) => b.compositeScore - a.compositeScore);
+    ranked.forEach((r,i) => r.rank = i + 1);
+    C.rankings[fw] = ranked;
+  });
+
+  // ── 6J: Alerts ──
+  C.alerts = [];
+  allStores.forEach(store => {
+    const fw = S.week;
+    const st = C.storeTotals[store][fw];
+    if (!st) return;
+    const triggers = [];
+    // Consecutive order declines
+    let consDecline = 0;
+    for (let i = 0; i < 4; i++) {
+      const prev = C.storeTotals[store][fw-i];
+      if (prev && prev.ordersWoW != null && prev.ordersWoW < -0.005) consDecline++; else break;
+    }
+    if (consDecline >= CONFIG.thresholds.consecutiveOrderDeclineWeeks) triggers.push({type:'orderDecline', severity:'red', detail:`Orders down ${consDecline} consecutive weeks`});
+
+    // Guest health
+    const gh = C.guestHealth[store][fw];
+    if (gh && gh.smoothed < CONFIG.thresholds.guestScoreRed) triggers.push({type:'guestHealth', severity:'red', detail:`Guest health score ${gh.smoothed} (below ${CONFIG.thresholds.guestScoreRed})`});
+    else if (gh) {
+      const prevGh = C.guestHealth[store][fw-1];
+      if (prevGh && prevGh.smoothed >= CONFIG.thresholds.guestScoreGreen && gh.smoothed < CONFIG.thresholds.guestScoreGreen) {
+        triggers.push({type:'guestHealth', severity:'yellow', detail:`Guest health dropped from ${prevGh.smoothed} to ${gh.smoothed}`});
+      }
+    }
+
+    // Food cost
+    const cost = C.costs[store][fw];
+    if (cost?.foodCostVariancePct != null) {
+      if (cost.foodCostVariancePct > CONFIG.thresholds.foodCostOverBudgetPct) triggers.push({type:'foodCost', severity:'red', detail:`Food cost ${fmtPct(cost.foodCostPct)} vs budget ${fmtPct(cost.budgetFoodCostPct)}`});
+      else if (cost.foodCostVariancePct > 0.01) triggers.push({type:'foodCost', severity:'yellow', detail:`Food cost ${fmtPct(cost.foodCostPct)} slightly over budget`});
+    }
+
+    // Budget pace
+    const bp = C.budgetPacing[store];
+    if (bp && bp.periodBudget > 0 && bp.variancePct < -0.10) triggers.push({type:'budgetPace', severity:'red', detail:`Sales ${fmtPct(Math.abs(bp.variancePct))} below budget pace`});
+
+    // Causal decomposition
+    let causal = '';
+    const sc = C.storeChannels[store][fw];
+    if (sc && st.salesWoW < -0.005) {
+      const chContribs = CONFIG.destinationChannels.map(ch => ({ch, contrib: sc.destination[ch]?.contributionToStoreChange || 0, change: (sc.destination[ch]?.sales || 0) - (C.storeChannels[store][fw-1]?.destination?.[ch]?.sales || sc.destination[ch]?.sales || 0)}));
+      chContribs.sort((a,b) => Math.abs(b.contrib) - Math.abs(a.contrib));
+      const top = chContribs[0];
+      if (top && Math.abs(top.contrib) > 0.2) causal = `${top.ch} contributed ${fmtPct(Math.abs(top.contrib))} of the change`;
+    }
+
+    // Dollar impact for red
+    let dollarImpact = null;
+    if (bp && bp.weeksRemaining > 0) {
+      const weeklyBudgetPace = bp.periodBudget / totalPeriodWeeks;
+      dollarImpact = (weeklyBudgetPace - st.sales) * bp.weeksRemaining;
+      if (dollarImpact < 0) dollarImpact = null;
+    }
+
+    const redCount = triggers.filter(t => t.severity === 'red').length;
+    const yellowCount = triggers.filter(t => t.severity === 'yellow').length;
+    let severity = 'green';
+    if (redCount >= 2 || (redCount >= 1 && yellowCount >= 1)) severity = 'red';
+    else if (redCount >= 1 || yellowCount >= 1) severity = 'yellow';
+
+    const headline = triggers.length ? triggers[0].detail : 'Performing normally';
+    const detail = causal || (triggers.length > 1 ? triggers.slice(1).map(t=>t.detail).join('; ') : '');
+    C.alerts.push({store, district: storeDistrict(store), severity, headline, detail, dollarImpact: severity==='red' ? dollarImpact : null, leadingIndicators: triggers.map(t=>t.type)});
+  });
+  C.alerts.sort((a,b) => {const ord = {red:0,yellow:1,green:2}; return (ord[a.severity]-ord[b.severity]) || ((b.dollarImpact||0)-(a.dollarImpact||0)); });
+
+  // ── 6K: Seasonality Context ──
+  C.seasonality = {};
+  if (S.features.hasSeasonality) {
+    const bh25Dest = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.type === 'Destination');
+    const annualSales = bh25Dest.reduce((s,r) => s + r.sales, 0);
+    const brandWeeklyAvg = annualSales / 52;
+    weeks.forEach(fw => {
+      const si = S.data.seasonality.find(r => r.fw === fw);
+      if (!si) { C.seasonality[fw] = null; return; }
+      const expected = brandWeeklyAvg * si.salesIndex;
+      const actual = C.brandTotals[fw]?.sales || 0;
+      const vs = expected > 0 ? (actual - expected) / expected : 0;
+      C.seasonality[fw] = {salesIndex:si.salesIndex, ordersIndex:si.ordersIndex, vsSeasonalSales:vs, vsSeasonalOrders:0,
+        narrative: `Week ${fw} indexes at ${si.salesIndex.toFixed(2)}x — performing ${fmtChg(vs)} vs seasonal expectation`};
+    });
+  }
+
+  // ── 6L: PMIX ──
+  C.pmix = {attachmentRates:{}, revenueArchitecture:{}, plateMigration:{}, valueMix:{}};
+  function classifyItem(name) {
+    const lc = name.toLowerCase();
+    for (const [cat, keywords] of Object.entries(CONFIG.itemClassifier)) {
+      if (keywords.some(kw => lc.includes(kw))) return cat;
+    }
+    return 'UNCATEGORIZED';
+  }
+  // Attachment rates by week (if weekly pmix available)
+  if (S.features.hasPmixWeekly) {
+    const plateShareTrend = [], valueShareTrend = [];
+    weeks.forEach(fw => {
+      const items = S.data.pmixWeekly2026.filter(r => r.fw === fw);
+      const cats = {};
+      items.forEach(r => {
+        const cat = classifyItem(r.item);
+        if (!cats[cat]) cats[cat] = {qty:0, sales:0};
+        cats[cat].qty += r.qty; cats[cat].sales += r.totalSales;
+      });
+      const entreeQty = (cats.ENTREE_PLATE?.qty||0) + (cats.ENTREE_SANDWICH?.qty||0) + (cats.ENTREE_VALUE?.qty||0) + (cats.ENTREE_OTHER?.qty||0);
+      const sideRate = entreeQty > 0 ? (cats.SIDE?.qty||0) / entreeQty : 0;
+      const dessertRate = entreeQty > 0 ? (cats.DESSERT?.qty||0) / entreeQty : 0;
+      const drinkRate = entreeQty > 0 ? (cats.DRINK?.qty||0) / entreeQty : 0;
+      C.pmix.attachmentRates[fw] = {sideRate, dessertRate, drinkRate, entreeCount:entreeQty};
+      const totalQty = Object.values(cats).reduce((s,c)=>s+c.qty,0);
+      if (totalQty > 0) { plateShareTrend.push({fw, share:(cats.ENTREE_PLATE?.qty||0)/totalQty}); valueShareTrend.push({fw, share:(cats.ENTREE_VALUE?.qty||0)/totalQty}); }
+    });
+    C.pmix.valueMix = {plateShareTrend, valueShareTrend};
+  }
+  // Revenue architecture by period
+  S.data.availablePeriods.forEach(per => {
+    const items = S.data.pmixPeriod2026.filter(r => r.period === per);
+    const arch = {};
+    let totalSales = 0;
+    items.forEach(r => {
+      const cat = classifyItem(r.item);
+      if (!arch[cat]) arch[cat] = {qty:0, sales:0, pct:0};
+      arch[cat].qty += r.qty; arch[cat].sales += r.totalSales;
+      totalSales += r.totalSales;
+    });
+    Object.values(arch).forEach(c => c.pct = totalSales > 0 ? c.sales / totalSales : 0);
+    C.pmix.revenueArchitecture[per] = arch;
+  });
+
+  // ── 6M: Brand History Aggregation ──
+  C.brandHistory2025 = {};
+  C.brandHistory2026 = {};
+  S.data.brandHistory.filter(r => r.type === 'Destination').forEach(r => {
+    const target = r.fiscalYear === 2025 ? C.brandHistory2025 : r.fiscalYear === 2026 ? C.brandHistory2026 : null;
+    if (!target) return;
+    if (!target[r.fw]) target[r.fw] = {sales:0, orders:0};
+    target[r.fw].sales += r.sales; target[r.fw].orders += r.orders;
+  });
+  Object.values(C.brandHistory2025).forEach(w => w.avgCheck = w.orders > 0 ? w.sales / w.orders : 0);
+  Object.values(C.brandHistory2026).forEach(w => w.avgCheck = w.orders > 0 ? w.sales / w.orders : 0);
+
+  // ── 6K: EBITDA Components ──
+  C.ebitda = {};
+  S.data.availablePeriods.forEach(per => {
+    const perNum = parseInt(per.replace('P',''));
+    const perWeeks = weeks.filter(w => S.data.weekToPeriod[w] === per);
+    if (!perWeeks.length) return;
+    let revenue=0, foodCostDollars=0, laborCostDollars=0, totalSalaryCost=0, totalPayrollTax=0;
+    allStores.forEach(store => {
+      const storePtdSales = perWeeks.reduce((s,w) => s + (C.storeTotals[store][w]?.sales||0), 0);
+      revenue += storePtdSales;
+      // Food cost
+      const fcPcts = perWeeks.map(w => C.costs[store][w]?.foodCostPct).filter(v => v!=null);
+      const avgFc = fcPcts.length ? fcPcts.reduce((a,b)=>a+b,0)/fcPcts.length : 0;
+      foodCostDollars += storePtdSales * avgFc;
+      // Labor cost (hourly)
+      const lcPcts = perWeeks.map(w => C.costs[store][w]?.laborCostPct).filter(v => v!=null);
+      const avgLc = lcPcts.length ? lcPcts.reduce((a,b)=>a+b,0)/lcPcts.length : 0;
+      const hourlyLabor = storePtdSales * avgLc;
+      laborCostDollars += hourlyLabor;
+      // Salary
+      let salaryRow = S.data.salary.find(r => r.store===store && r.period===perNum && r.periodSalary!=null);
+      if (!salaryRow) salaryRow = S.data.salary.find(r => r.store===store && r.periodSalary!=null);
+      const periodSalary = salaryRow?.periodSalary || 0;
+      const taxRate = salaryRow?.payrollTax ?? CONFIG.defaultPayrollTaxRate;
+      totalSalaryCost += periodSalary;
+      totalPayrollTax += (hourlyLabor + periodSalary) * taxRate;
+    });
+    const allInLabor = laborCostDollars + totalSalaryCost + totalPayrollTax;
+    const budgetRows = S.data.budget.filter(b => b.period===perNum);
+    const budgetRevenue = budgetRows.reduce((s,b)=>s+b.budgetSales,0);
+    const budgetEbitdaPct = budgetRows.length ? budgetRows.reduce((s,b)=>s+b.budgetEbitdaPct,0)/budgetRows.length : 0;
+    C.ebitda[per] = {revenue, foodCost:foodCostDollars, laborCostHourly:laborCostDollars, salaryCost:totalSalaryCost, payrollTax:totalPayrollTax, allInLabor,
+      ebitda:0, ebitdaPct:0, budgetEbitdaPct, budgetRevenue};
+  });
+}
+
+// Helper
+function storeDistrict(store) {
+  for (const [d, stores] of Object.entries(CONFIG.districts)) { if (stores.includes(store)) return d; }
+  return 'Unknown';
+}
+function interpLinear(value, anchors) {
+  if (value <= anchors[0][0]) return anchors[0][1];
+  if (value >= anchors[anchors.length-1][0]) return anchors[anchors.length-1][1];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    if (value >= anchors[i][0] && value <= anchors[i+1][0]) {
+      const pct = (value - anchors[i][0]) / (anchors[i+1][0] - anchors[i][0]);
+      return anchors[i][1] + pct * (anchors[i+1][1] - anchors[i][1]);
+    }
+  }
+  return 0;
+}
+function getStores() {
+  if (S.district === 'All') return S.data.stores.map(s=>s.name);
+  return CONFIG.districts[S.district] || [];
+}
+function getAgg(fw) {
+  if (S.district === 'All') return S.computed.brandTotals[fw];
+  return S.computed.districtTotals[S.district]?.[fw];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NAV & TAB MANAGEMENT
+   ═══════════════════════════════════════════════════════════════════ */
+function setDistrict(d) {
+  S.district = d;
+  document.querySelectorAll('.district-btn').forEach(b => b.classList.toggle('active', b.dataset.district === d));
+  renderTab();
+}
+function setWeek(w) {
+  S.week = w;
+  S.data.currentPeriod = S.data.weekToPeriod[w] || S.data.currentPeriod;
+  renderTab();
+}
+function setTab(t) {
+  S.tab = t;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  renderTab();
+}
+function renderTab() {
+  const map = {
+    command: renderCommandCenter,
+    traffic: renderTraffic,
+    scorecard: renderScorecard,
+    financials: renderFinancials,
+    menu: renderMenu,
+    trajectory: renderTrajectory
+  };
+  (map[S.tab] || renderCommandCenter)();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 11 — TAB STUBS
+   ═══════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION 12 — HELPER FUNCTIONS FOR COMMAND CENTER & SCORECARD
+   ═══════════════════════════════════════════════════════════════════ */
+function navigateToStore(store) {
+  S.store = store;
+  setTab('scorecard');
+}
+
+function scorecardRowClick(store) {
+  S.store = store;
+  renderScorecard();
+}
+
+function dimensionBar(score, max) {
+  if (score == null) return '<span style="color:var(--muted)">—</span>';
+  const pct = Math.round(score / max * 100);
+  const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--yellow)' : 'var(--red)';
+  return `<div class="dim-bar"><div class="dim-track"><div class="dim-fill" style="width:${pct}%;background:${color}"></div></div><span class="dim-score">${Math.round(score)}</span></div>`;
+}
+
+function buildDecompSentence(agg) {
+  if (!agg || agg.salesWoW == null) return '<div class="decomp-sentence" style="color:var(--muted)">First week — no prior week comparison available.</div>';
+  const dir = agg.salesWoW >= 0 ? 'up' : 'down';
+  const pct = (Math.abs(agg.salesWoW) * 100).toFixed(1);
+  const tPct = agg.trafficContrib != null ? Math.round(Math.abs(agg.trafficContrib) * 100) : '—';
+  const cPct = agg.checkContrib != null ? Math.round(Math.abs(agg.checkContrib) * 100) : '—';
+  const sig = signalLabel(agg.signal);
+  return `<div class="decomp-sentence">Sales ${dir} ${pct}% WoW — traffic contributed ${tPct}%, check contributed ${cPct}% → <span style="color:${sig.color};font-weight:700">${sig.label}</span></div>`;
+}
+
+function countSignals(stores, fw) {
+  const counts = { BALANCED_GROWTH: 0, CHECK_INFLATION: 0, CHECK_EROSION: 0, DECLINE: 0 };
+  stores.forEach(store => {
+    const st = S.computed.storeTotals[store]?.[fw];
+    if (st?.signal) counts[st.signal]++;
+  });
+  return counts;
+}
+
+function formatSignalDist(counts) {
+  const labels = [
+    { key: 'BALANCED_GROWTH', abbr: 'BG', color: 'var(--green)' },
+    { key: 'CHECK_INFLATION', abbr: 'CI', color: 'var(--yellow)' },
+    { key: 'CHECK_EROSION', abbr: 'CE', color: 'var(--blue)' },
+    { key: 'DECLINE', abbr: 'D', color: 'var(--red)' }
+  ];
+  return labels.filter(l => counts[l.key] > 0).map(l => `<span style="color:${l.color};font-weight:600">${counts[l.key]} ${l.abbr}</span>`).join(', ');
+}
+
+function buildNarrative(store, fw) {
+  const st = S.computed.storeTotals[store]?.[fw];
+  const rank = (S.computed.rankings[fw] || []).find(r => r.store === store);
+  const bp = S.computed.budgetPacing[store];
+  const gh = S.computed.guestHealth[store]?.[fw];
+  const sig = st ? signalLabel(st.signal) : {label:'—',color:'var(--muted)'};
+  if (!rank || !st) return `<em>No data available for ${store} in week ${fw}.</em>`;
+
+  let narrative = `${store} is ranked ${ordinal(rank.rank)} this week`;
+  const prevRank = (S.computed.rankings[fw-1] || []).find(r => r.store === store);
+  if (prevRank) {
+    if (rank.rank < prevRank.rank) narrative += `, up from ${ordinal(prevRank.rank)} last week`;
+    else if (rank.rank > prevRank.rank) narrative += `, down from ${ordinal(prevRank.rank)} last week`;
+  }
+  narrative += `. `;
+  narrative += `${sig.label} pattern — `;
+  if (st.signal === 'BALANCED_GROWTH') narrative += 'sales and orders both trending positive.';
+  else if (st.signal === 'CHECK_INFLATION') narrative += 'sales growing from check increases but traffic softening.';
+  else if (st.signal === 'CHECK_EROSION') narrative += 'traffic growing but spending per fan declining.';
+  else narrative += 'both sales and traffic declining.';
+  if (bp) {
+    if (bp.onPace) narrative += ` On pace to exceed period budget by ${fmt$(Math.abs(bp.variance))}.`;
+    else narrative += ` Behind budget pace — needs ${fmt$(bp.weeklyRunRateNeeded)}/week to close the gap.`;
+  }
+  return narrative;
+}
+
+function renderCommandCenter() {
+  const fw = S.week;
+  const agg = getAgg(fw);
+  const stores = getStores();
+  const allAlerts = S.computed.alerts || [];
+  const distAlerts = allAlerts.filter(a => stores.includes(a.store));
+  const redAlerts = distAlerts.filter(a => a.severity === 'red').sort((a,b) => (b.dollarImpact||0) - (a.dollarImpact||0));
+  const yellowAlerts = distAlerts.filter(a => a.severity === 'yellow').sort((a,b) => a.store.localeCompare(b.store));
+  const period = S.data.weekToPeriod[fw] || '';
+  const sig = agg ? signalLabel(agg.signal) : {label:'—',color:'var(--muted)'};
+
+  let html = '';
+
+  // ── Section 1: Brand Pulse KPI Tiles ──
+  html += `<div class="kpi-row">`;
+  html += kpiTile({label:'Total Sales', value:fmt$(agg?.sales), wowChange:agg?.salesWoW, yoyChange:agg?.salesYoY, size:'large'});
+  html += kpiTile({label:'Total Orders', value:(agg?.orders||0).toLocaleString(), wowChange:agg?.ordersWoW, yoyChange:agg?.ordersYoY});
+  html += kpiTile({label:'Avg Check', value:fmt$(agg?.avgCheck), wowChange:agg?.checkWoW, yoyChange:agg?.checkYoY});
+  html += kpiTile({label:'Signal', value:`<span style="color:${sig.color}">${sig.label}</span>`, subtitle:`${period} — Week ${fw}`});
+  html += `</div>`;
+
+  // ── Decomposition Sentence + Seasonality ──
+  html += `<div class="card" style="padding:12px 20px">`;
+  html += buildDecompSentence(agg);
+  if (S.features.hasSeasonality && S.computed.seasonality[fw]) {
+    html += `<div class="season-note">${S.computed.seasonality[fw].narrative}</div>`;
+  }
+  html += `</div>`;
+
+  // ── Section 3: Alert Panel ──
+  html += `<div class="card"><div class="card-title">Alerts — ${S.district === 'All' ? 'All Stores' : S.district + ' District'}</div>`;
+  if (redAlerts.length) {
+    redAlerts.forEach(a => {
+      html += `<div class="alert-row red"><div>`;
+      html += `<div class="alert-headline"><a class="alert-store-link" onclick="navigateToStore('${a.store.replace(/'/g,"\\'")}')">${a.store}</a>: ${a.headline}</div>`;
+      if (a.detail) html += `<div class="alert-detail">${a.detail}</div>`;
+      if (a.dollarImpact > 0) html += `<div class="alert-impact" style="color:var(--red)">Est. period impact: ${fmt$(a.dollarImpact)}</div>`;
+      html += `</div></div>`;
+    });
+  }
+  if (yellowAlerts.length) {
+    yellowAlerts.forEach(a => {
+      html += `<div class="alert-row yellow"><div>`;
+      html += `<div class="alert-headline"><a class="alert-store-link" onclick="navigateToStore('${a.store.replace(/'/g,"\\'")}')">${a.store}</a>: ${a.headline}</div>`;
+      if (a.detail) html += `<div class="alert-detail">${a.detail}</div>`;
+      html += `</div></div>`;
+    });
+  }
+  if (!redAlerts.length && !yellowAlerts.length) {
+    html += `<div class="alert-row green"><div class="alert-headline">✅ All stores performing within normal thresholds</div></div>`;
+  }
+  if (redAlerts.length || yellowAlerts.length) {
+    const alertedStores = new Set(distAlerts.filter(a => a.severity !== 'green').map(a => a.store));
+    const greenCount = stores.filter(s => !alertedStores.has(s)).length;
+    if (greenCount > 0) html += `<div class="green-stores-note">${greenCount} store${greenCount > 1 ? 's' : ''} with no active alerts</div>`;
+  }
+  html += `</div>`;
+
+  // ── Section 4: District Summary (only when All selected) ──
+  if (S.district === 'All') {
+    html += `<div class="card"><div class="card-title">District Summary — Week ${fw}</div>`;
+    html += `<div class="table-wrap"><table class="data-table"><thead><tr>`;
+    html += `<th>District</th><th>Sales</th><th>WoW</th><th>Orders</th><th>WoW</th><th>Alerts</th><th>Signal Distribution</th>`;
+    html += `</tr></thead><tbody>`;
+    Object.keys(CONFIG.districts).forEach(dist => {
+      const dt = S.computed.districtTotals[dist]?.[fw];
+      const dStores = CONFIG.districts[dist];
+      const dAlerts = allAlerts.filter(a => dStores.includes(a.store));
+      const dRed = dAlerts.filter(a => a.severity === 'red').length;
+      const dYellow = dAlerts.filter(a => a.severity === 'yellow').length;
+      const sigCounts = countSignals(dStores, fw);
+      html += `<tr class="district-summary-table">`;
+      html += `<td style="font-weight:700">${dist}</td>`;
+      html += `<td>${fmt$(dt?.sales)}</td>`;
+      html += `<td><span style="color:${chgColor(dt?.salesWoW)}">${fmtChg(dt?.salesWoW)}</span></td>`;
+      html += `<td>${(dt?.orders||0).toLocaleString()}</td>`;
+      html += `<td><span style="color:${chgColor(dt?.ordersWoW)}">${fmtChg(dt?.ordersWoW)}</span></td>`;
+      html += `<td>${dRed > 0 ? `<span style="color:var(--red);font-weight:600">${dRed} red</span>` : '0 red'}, ${dYellow > 0 ? `<span style="color:var(--yellow);font-weight:600">${dYellow} yellow</span>` : '0 yellow'}</td>`;
+      html += `<td>${formatSignalDist(sigCounts)}</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
+
+  // ── Section 5: Store Quick-View Table ──
+  html += `<div class="card"><div class="card-title">All Stores — Week ${fw}</div>`;
+  const rankData = (S.computed.rankings[fw] || []).filter(r => stores.includes(r.store));
+  html += sortableTable({
+    id:'cmd-store-table',
+    headers:[
+      {key:'rank',label:'Rank',format:'rank',width:'50px',align:'center'},
+      {key:'store',label:'Store',width:'130px'},
+      {key:'district',label:'District',width:'70px'},
+      {key:'sales',label:'Sales',format:'currency',sortable:true},
+      {key:'salesWoW',label:'Sales WoW',format:'changePct',sortable:true},
+      {key:'orders',label:'Orders',format:'number',sortable:true},
+      {key:'ordersWoW',label:'Orders WoW',format:'changePct',sortable:true},
+      {key:'avgCheck',label:'Avg Check',format:'currency',sortable:true},
+      {key:'guestScore',label:'Guest',format:'score',sortable:true},
+      {key:'signal',label:'Signal',format:'signal',width:'130px'}
+    ],
+    rows: rankData.map(r => {
+      const st = S.computed.storeTotals[r.store]?.[fw] || {};
+      const gh = S.computed.guestHealth[r.store]?.[fw];
+      return {store:r.store, district:r.district, rank:r.rank, sales:st.sales, salesWoW:st.salesWoW, orders:st.orders, ordersWoW:st.ordersWoW, avgCheck:st.avgCheck, guestScore:gh?.smoothed, signal:st.signal};
+    }),
+    groupBy:'district', groupOrder:Object.keys(CONFIG.districts),
+    defaultSort:{key:'rank',dir:'asc'},
+    onRowClick: navigateToStore
+  });
+  html += `</div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function getSalesWeightedCost(stores, fw, costField) {
+  let totalCostDollars = 0, totalSales = 0;
+  stores.forEach(store => {
+    const c = S.computed.costs[store]?.[fw];
+    const st = S.computed.storeTotals[store]?.[fw];
+    if (c && c[costField] != null && st && st.sales > 0) {
+      totalCostDollars += c[costField] * st.sales;
+      totalSales += st.sales;
+    }
+  });
+  return totalSales > 0 ? totalCostDollars / totalSales : null;
+}
+
+function getPeriodTotals(period) {
+  const periodWeeks = S.data.availableWeeks.filter(w => S.data.weekToPeriod[w] === period);
+  if (!periodWeeks.length) return null;
+  const allStores = S.data.stores.map(s => s.name);
+  let sales = 0, orders = 0;
+  periodWeeks.forEach(w => {
+    allStores.forEach(store => {
+      const st = S.computed.storeTotals[store]?.[w];
+      if (st) { sales += st.sales; orders += st.orders; }
+    });
+  });
+  const avgCheck = orders > 0 ? sales / orders : 0;
+  const perNum = parseInt(period.replace('P', ''));
+  const pyRows = S.data.priorYear.filter(r => r.period === perNum && r.type === 'Destination');
+  const pySales = pyRows.reduce((s, r) => s + (r.sales || 0), 0);
+  const pyOrders = pyRows.reduce((s, r) => s + (r.orders || 0), 0);
+  const eb = S.computed.ebitda[period];
+  const lastWeek = periodWeeks[periodWeeks.length - 1];
+  const guestScores = allStores.map(store => S.computed.guestHealth[store]?.[lastWeek]?.smoothed).filter(s => s != null);
+  const avgGuestScore = guestScores.length > 0 ? Math.round(guestScores.reduce((a, b) => a + b, 0) / guestScores.length) : null;
+  return {
+    period, weeks: periodWeeks.length, sales, orders, avgCheck,
+    pySales, pyOrders, pyAvgCheck: pyOrders > 0 ? pySales / pyOrders : 0,
+    salesYoY: pySales > 0 ? (sales - pySales) / pySales : null,
+    ordersYoY: pyOrders > 0 ? (orders - pyOrders) / pyOrders : null,
+    foodCostPct: eb?.revenue > 0 ? eb.foodCost / eb.revenue : null,
+    laborPct: eb?.revenue > 0 ? eb.allInLabor / eb.revenue : null,
+    ebitdaPct: eb?.ebitda && eb.revenue > 0 ? eb.ebitda / eb.revenue : null,
+    guestScore: avgGuestScore
+  };
+}
+
+function renderTraffic() {
+  const fw = S.week;
+  const ch = S.computed.channels[fw];
+  const agg = getAgg(fw);
+  const chPrev = S.computed.channels[fw - 1];
+
+  // ── Section 1: KPI Tiles ──
+  const dinein = ch?.destination?.['Dine-in'];
+  const mkt = ch?.destination?.['Marketplace'];
+  const cat = ch?.destination?.['Catering'];
+  let html = `<div class="kpi-row">`;
+  html += kpiTile({label:'Total Orders', value:(agg?.orders||0).toLocaleString(), wowChange:agg?.ordersWoW, yoyChange:agg?.ordersYoY});
+  // Compute Dine-in YoY from brand history
+  const dineinBh25 = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination' && r.cat === 'Dine-in');
+  const dineinPyOrders = dineinBh25.reduce((s,r) => s + (r.orders||0), 0);
+  const dineinYoY = dineinPyOrders > 0 && dinein ? (dinein.orders - dineinPyOrders) / dineinPyOrders : null;
+  html += kpiTile({label:'Dine-in Orders', value:(dinein?.orders||0).toLocaleString(), wowChange:dinein?.ordersWoW, yoyChange:dineinYoY});
+  html += kpiTile({label:'Marketplace Orders', value:(mkt?.orders||0).toLocaleString(), wowChange:mkt?.ordersWoW});
+  html += kpiTile({label:'Catering Revenue', value:fmt$(cat?.sales), wowChange:cat?.salesWoW, subtitle:`${(cat?.orders||0).toLocaleString()} orders this week`});
+  html += `</div>`;
+
+  // ── Section 2: Destination Channels Table ──
+  // Build YoY from brandHistory
+  const destChannels = CONFIG.destinationChannels.map(c => {
+    const d = ch?.destination?.[c] || {};
+    if (!d.orders && !d.sales) return null;
+    // YoY from Brand_Weekly_History
+    const bh25 = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination' && r.cat === c);
+    const pyOrders = bh25.reduce((s,r) => s + (r.orders||0), 0);
+    const yoyOrders = pyOrders > 0 ? (d.orders - pyOrders) / pyOrders : null;
+    return {channel:c, sales:d.sales||0, orders:d.orders||0, shareOfOrders:d.shareOfOrders||0, avgCheck:d.avgCheck||0, salesWoW:d.salesWoW, ordersWoW:d.ordersWoW, yoyOrders};
+  }).filter(Boolean);
+  destChannels.sort((a,b) => b.orders - a.orders);
+
+  html += `<div class="card"><div class="card-title">Destination Channels — Week ${fw}</div>`;
+  html += sortableTable({
+    id:'traffic-dest', headers:[
+      {key:'channel',label:'Channel',width:'140px'},
+      {key:'sales',label:'Sales',format:'currency',sortable:true},
+      {key:'orders',label:'Orders',format:'number',sortable:true},
+      {key:'shareOfOrders',label:'Order Share',format:'percent',sortable:true},
+      {key:'avgCheck',label:'Avg Check',format:'currency',sortable:true},
+      {key:'salesWoW',label:'Sales WoW',format:'changePct',sortable:true},
+      {key:'ordersWoW',label:'Orders WoW',format:'changePct',sortable:true},
+      {key:'yoyOrders',label:'YoY Orders',format:'changePct',sortable:true}
+    ],
+    rows: destChannels,
+    defaultSort:{key:'orders',dir:'desc'}
+  });
+  // Biggest mover
+  let biggestMover = null, biggestAbs = 0;
+  destChannels.forEach(d => {
+    const prev = chPrev?.destination?.[d.channel];
+    if (prev) {
+      const absChange = Math.abs(d.orders - prev.orders);
+      if (absChange > biggestAbs) { biggestAbs = absChange; biggestMover = {channel:d.channel, change:d.orders - prev.orders, pct:d.ordersWoW}; }
+    }
+  });
+  if (biggestMover) {
+    const sign = biggestMover.change > 0 ? '+' : '';
+    html += `<div style="font-size:12px;color:var(--muted);padding:6px 10px">Biggest mover: ${biggestMover.channel} ${sign}${biggestMover.change} orders (${fmtChg(biggestMover.pct)})</div>`;
+  }
+  html += '</div>';
+
+  // ── Section 3: Daypart Distribution Table ──
+  const dpData = CONFIG.allDayparts.map(dp => {
+    const d = ch?.daypart?.[dp] || {};
+    return {daypart:dp, label:CONFIG.daypartLabels[dp]||dp, sales:d.sales||0, orders:d.orders||0, shareOfOrders:d.shareOfOrders||0, avgCheck:d.avgCheck||0, salesWoW:d.salesWoW, ordersWoW:d.ordersWoW};
+  }).sort((a,b) => b.sales - a.sales);
+
+  html += `<div class="card"><div class="card-title">Daypart Distribution — Week ${fw}</div>`;
+  html += sortableTable({
+    id:'traffic-dayparts', headers:[
+      {key:'label',label:'Daypart',width:'160px'},
+      {key:'sales',label:'Sales',format:'currency',sortable:true},
+      {key:'orders',label:'Orders',format:'number',sortable:true},
+      {key:'shareOfOrders',label:'Order Share',format:'percent',sortable:true},
+      {key:'avgCheck',label:'Avg Check',format:'currency',sortable:true},
+      {key:'salesWoW',label:'Sales WoW',format:'changePct',sortable:true},
+      {key:'ordersWoW',label:'Orders WoW',format:'changePct',sortable:true}
+    ],
+    rows: dpData,
+    defaultSort:{key:'sales',dir:'desc'}
+  });
+  html += '</div>';
+
+  // ── Section 4: Channel × Daypart — Side by Side Bar Charts ──
+  html += `<div class="chart-row">`;
+  // Left: Destination WoW Change
+  html += `<div class="card"><div class="card-title">Destination WoW Change</div>`;
+  html += `<div style="position:relative;height:200px"><canvas id="traffic-dest-wow"></canvas></div></div>`;
+  // Right: Daypart WoW Change
+  html += `<div class="card"><div class="card-title">Daypart WoW Change</div>`;
+  html += `<div style="position:relative;height:200px"><canvas id="traffic-dp-wow"></canvas></div></div>`;
+  html += `</div>`;
+
+  // ── Section 5: 6-Week Channel Trends ──
+  html += `<div class="chart-row">`;
+  html += `<div class="card"><div class="card-title">Destination Trends — Last 6 Weeks</div>`;
+  html += `<div style="position:relative;height:220px"><canvas id="traffic-dest-trend"></canvas></div></div>`;
+  html += `<div class="card"><div class="card-title">Daypart Trends — Last 6 Weeks</div>`;
+  html += `<div style="position:relative;height:220px"><canvas id="traffic-dp-trend"></canvas></div></div>`;
+  html += `</div>`;
+
+  // ── Section 6: Avg Check by Channel ──
+  const matChannels = CONFIG.materialChannels;
+  html += `<div class="card"><div class="card-title">Avg Check by Channel — Week ${fw}</div>`;
+  html += `<div class="kpi-row">`;
+  matChannels.forEach(c => {
+    const d = ch?.destination?.[c];
+    html += kpiTile({label:c, value:fmt$(d?.avgCheck), wowChange:d?.checkWoW});
+  });
+  html += `</div></div>`;
+
+  document.getElementById('content').innerHTML = html;
+
+  // ── Render Charts (after DOM update) ──
+  setTimeout(() => {
+    // Dest WoW bar chart
+    const destWowChannels = matChannels.filter(c => ch?.destination?.[c]?.ordersWoW != null);
+    const destWowLabels = destWowChannels;
+    const destWowData = destWowChannels.map(c => (ch.destination[c].ordersWoW || 0) * 100);
+    const destWowColors = destWowData.map(v => v >= 0 ? resolveColor('var(--green)') : resolveColor('var(--red)'));
+    createBarChart('traffic-dest-wow', {
+      horizontal: true,
+      labels: destWowLabels,
+      datasets: [{label:'Orders WoW %', data:destWowData, colors:destWowColors}],
+      yAxisFormat: 'number',
+      showLegend: false
+    });
+
+    // Daypart WoW bar chart
+    const dpWowParts = CONFIG.dayparts;
+    const dpWowData = dpWowParts.map(dp => ((ch?.daypart?.[dp]?.ordersWoW) || 0) * 100);
+    const dpWowColors = dpWowData.map(v => v >= 0 ? resolveColor('var(--green)') : resolveColor('var(--red)'));
+    createBarChart('traffic-dp-wow', {
+      horizontal: true,
+      labels: dpWowParts.map(dp => CONFIG.daypartLabels[dp] || dp),
+      datasets: [{label:'Orders WoW %', data:dpWowData, colors:dpWowColors}],
+      yAxisFormat: 'number',
+      showLegend: false
+    });
+
+    // 6-week dest trends
+    const recentWeeks = S.data.availableWeeks.slice(-6);
+    const wLabels = recentWeeks.map(w => 'W'+w);
+    // Top 3 dest channels by current orders
+    const top3Dest = [...destChannels].sort((a,b) => b.orders - a.orders).slice(0, 3);
+    const destColors = ['var(--chart-2026)', 'var(--brown-light)', 'var(--muted)'];
+    const destStyles = ['solid', 'solid', 'dashed'];
+    const destDatasets = top3Dest.map((c, i) => ({
+      label: c.channel,
+      data: recentWeeks.map(w => S.computed.channels[w]?.destination?.[c.channel]?.orders || 0),
+      color: destColors[i], style: destStyles[i]
+    }));
+    // Add 2025 comparison for top channel if available
+    if (top3Dest.length) {
+      const topCh = top3Dest[0].channel;
+      const has2025 = recentWeeks.some(w => {
+        const bh = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === w && r.type === 'Destination' && r.cat === topCh);
+        return bh.length > 0;
+      });
+      if (has2025) {
+        destDatasets.push({
+          label: topCh + ' 2025',
+          data: recentWeeks.map(w => {
+            const bh = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === w && r.type === 'Destination' && r.cat === topCh);
+            return bh.reduce((s,r) => s + (r.orders||0), 0) || null;
+          }),
+          color: 'var(--chart-2025)', style: 'dashed'
+        });
+      }
+    }
+    createTrendChart('traffic-dest-trend', {
+      labels: wLabels, datasets: destDatasets,
+      yAxisFormat: 'number', yAxisLabel: 'Orders', showLegend: true
+    });
+
+    // 6-week daypart trends
+    const dpDatasets = CONFIG.dayparts.map((dp, i) => ({
+      label: CONFIG.daypartLabels[dp] || dp,
+      data: recentWeeks.map(w => S.computed.channels[w]?.daypart?.[dp]?.orders || 0),
+      color: destColors[i], style: destStyles[i]
+    }));
+    createTrendChart('traffic-dp-trend', {
+      labels: wLabels, datasets: dpDatasets,
+      yAxisFormat: 'number', yAxisLabel: 'Orders', showLegend: true
+    });
+  }, 0);
+}
+
+function renderScorecard() {
+  const fw = S.week;
+  const stores = getStores();
+  const storeCount = stores.length;
+  let html = '';
+
+  // ── Section A: Rankings Table ──
+  html += `<div class="card"><div class="card-title">Store Rankings — Week ${fw}</div>`;
+  const rankData = (S.computed.rankings[fw] || []).filter(r => stores.includes(r.store));
+  const RD = CONFIG.rankDimensions;
+  html += sortableTable({
+    id:'scorecard-rank-table',
+    headers:[
+      {key:'rank',label:'Rank',format:'rank',width:'50px',align:'center'},
+      {key:'store',label:'Store',width:'120px'},
+      {key:'compositeScore',label:'Composite',width:'70px',align:'center',sortable:true},
+      {key:'sm',label:'SM',width:'70px'},
+      {key:'td',label:'TD',width:'70px'},
+      {key:'cd',label:'CD',width:'70px'},
+      {key:'gh',label:'GH',width:'70px'},
+      {key:'bp',label:'BP',width:'70px'},
+      {key:'sales',label:'Sales',format:'currency',sortable:true},
+      {key:'ordersWoW',label:'Orders WoW',format:'changePct',sortable:true},
+      {key:'signal',label:'Signal',format:'signal',width:'120px'}
+    ],
+    rows: rankData.map(r => {
+      const st = S.computed.storeTotals[r.store]?.[fw] || {};
+      const d = r.dimensions || {};
+      return {
+        store:r.store, district:r.district, rank:r.rank, compositeScore:r.compositeScore,
+        sm: dimensionBar(d.salesMomentum, RD.salesMomentum.max),
+        td: dimensionBar(d.trafficDirection, RD.trafficDirection.max),
+        cd: dimensionBar(d.costDiscipline, RD.costDiscipline.max),
+        gh: dimensionBar(d.guestHealth, RD.guestHealth.max),
+        bp: dimensionBar(d.budgetPace, RD.budgetPace.max),
+        sales:st.sales, ordersWoW:st.ordersWoW, signal:st.signal
+      };
+    }),
+    groupBy:'district', groupOrder:Object.keys(CONFIG.districts),
+    defaultSort:{key:'rank',dir:'asc'},
+    onRowClick: scorecardRowClick,
+    highlightRow: r => r.store === S.store
+  });
+  html += `</div>`;
+
+  if (!S.store) {
+    html += `<div class="card" style="text-align:center;color:var(--muted);padding:30px">Click any store to see the full diagnostic.</div>`;
+  }
+
+  // ── Section B: Store Deep Dive ──
+  if (S.store && stores.includes(S.store)) {
+    const store = S.store;
+    const st = S.computed.storeTotals[store]?.[fw] || {};
+    const rank = (S.computed.rankings[fw] || []).find(r => r.store === store);
+    const bp = S.computed.budgetPacing[store];
+    const gh = S.computed.guestHealth[store]?.[fw];
+    const cost = S.computed.costs[store]?.[fw];
+    const sc = S.computed.storeChannels[store]?.[fw];
+    const per = S.data.currentPeriod;
+
+    // ── B1: Headline Narrative ──
+    html += `<div class="dive-card"><div class="dive-title"><span>${store} — Detailed Diagnostic</span><button class="dive-close" onclick="S.store=null;renderScorecard()">✕</button></div>`;
+    html += `<div class="narrative-card">${buildNarrative(store, fw)}</div>`;
+    html += `</div>`;
+
+    // ── B2: KPI Tiles ──
+    html += `<div class="kpi-row">`;
+    html += kpiTile({label:'Sales', value:fmt$(st.sales), wowChange:st.salesWoW, yoyChange:st.salesYoY});
+    html += kpiTile({label:'Orders', value:(st.orders||0).toLocaleString(), wowChange:st.ordersWoW, yoyChange:st.ordersYoY});
+    html += kpiTile({label:'Avg Check', value:fmt$(st.avgCheck), wowChange:st.checkWoW, yoyChange:st.checkYoY});
+    html += kpiTile({label:'Composite Rank', value:`#${rank?.rank||'—'} / ${storeCount}`, subtitle:`Score: ${rank?.compositeScore||'—'}`});
+    html += `</div>`;
+    html += `<div class="card" style="padding:8px 20px">${buildDecompSentence(st)}</div>`;
+
+    // ── B3: 6-Week Trend Charts ──
+    const recentWeeks = S.data.availableWeeks.slice(-6);
+    const chartLabels = recentWeeks.map(w => 'W'+w);
+    html += `<div class="chart-row">`;
+    html += `<div class="card"><div class="card-title">Sales — ${store} vs Brand Avg</div><div style="position:relative;height:200px"><canvas id="sc-sales-trend"></canvas></div></div>`;
+    html += `<div class="card"><div class="card-title">Orders — ${store} vs Brand Avg</div><div style="position:relative;height:200px"><canvas id="sc-orders-trend"></canvas></div></div>`;
+    html += `</div>`;
+
+    // ── B4: Channel Decomposition ──
+    if (st.salesWoW != null && sc) {
+      html += `<div class="card"><div class="card-title">What's Driving the Change</div>`;
+      // Destinations
+      const destChannels = CONFIG.destinationChannels.map(ch => {
+        const d = sc.destination?.[ch] || {};
+        const priorSales = S.computed.storeChannels[store]?.[fw-1]?.destination?.[ch]?.sales || 0;
+        const dollarChange = (d.sales||0) - priorSales;
+        return {channel:ch, sales:d.sales||0, dollarChange, salesWoW:d.salesWoW, contrib:d.contributionToStoreChange||0};
+      }).filter(r => r.sales > 0 || Math.abs(r.dollarChange) > 0).sort((a,b) => Math.abs(b.contrib) - Math.abs(a.contrib));
+
+      if (destChannels.length) {
+        html += `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Destinations</div>`;
+        html += `<div class="table-wrap"><table class="data-table"><thead><tr><th>Channel</th><th>This Week Sales</th><th>WoW Change</th><th>Contribution</th></tr></thead><tbody>`;
+        const topContrib = destChannels[0];
+        destChannels.forEach(r => {
+          const isBold = r.channel === topContrib.channel ? 'font-weight:700' : '';
+          html += `<tr><td style="${isBold}">${r.channel}</td><td>${fmt$(r.sales)}</td>`;
+          html += `<td><span style="color:${chgColor(r.salesWoW)}">${fmt$(r.dollarChange)} (${fmtChg(r.salesWoW)})</span></td>`;
+          html += `<td style="${isBold};color:${chgColor(r.contrib)}">${fmtPct(Math.abs(r.contrib))}</td></tr>`;
+        });
+        html += `</tbody></table></div>`;
+        if (topContrib) {
+          html += `<div style="font-size:12px;color:var(--muted);padding:6px 0">${topContrib.channel} accounts for ${fmtPct(Math.abs(topContrib.contrib))} of this week's sales change (${fmt$(topContrib.dollarChange)})</div>`;
+        }
+      }
+
+      // Dayparts
+      const daypartData = CONFIG.allDayparts.map(dp => {
+        const d = sc.daypart?.[dp] || {};
+        const storeOrders = st.orders || 1;
+        return {daypart: CONFIG.daypartLabels[dp] || dp, sales:d.sales||0, orders:d.orders||0, shareOfOrders: storeOrders > 0 ? (d.orders||0)/storeOrders : 0};
+      }).filter(r => r.orders > 0).sort((a,b) => b.sales - a.sales);
+
+      if (daypartData.length) {
+        html += `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">Dayparts</div>`;
+        html += `<div class="table-wrap"><table class="data-table"><thead><tr><th>Daypart</th><th>This Week Sales</th><th>Orders</th><th>Share of Orders</th></tr></thead><tbody>`;
+        daypartData.forEach(r => {
+          html += `<tr><td>${r.daypart}</td><td>${fmt$(r.sales)}</td><td>${r.orders.toLocaleString()}</td><td>${fmtPct(r.shareOfOrders)}</td></tr>`;
+        });
+        html += `</tbody></table></div>`;
+      }
+      html += `</div>`;
+    }
+
+    // ── B5: Controllable Costs ──
+    html += `<div class="card"><div class="card-title">Cost Management — Week ${fw}</div>`;
+    html += `<div class="kpi-row">`;
+    // Food Cost
+    const foodActual = cost?.foodCostPct;
+    const foodBudget = cost?.budgetFoodCostPct;
+    const foodVarD = cost?.foodCostVarianceDollars;
+    let foodSub = '';
+    if (foodBudget != null) foodSub += `Budget: ${fmtPct(foodBudget)}`;
+    if (foodVarD != null) {
+      const over = foodVarD > 0;
+      foodSub += `<br><span style="color:${over?'var(--red)':'var(--green)'}">${over?'+':''}${fmt$(foodVarD)} ${over?'over':'under'} budget</span>`;
+    }
+    html += kpiTile({label:'Food Cost %', value:fmtPct(foodActual), subtitle:foodSub});
+
+    // Labor Cost
+    const laborActual = cost?.laborCostPct;
+    const laborBudget = cost?.budgetAllInLaborPct;
+    const laborVarD = cost?.laborCostVarianceDollars;
+    let laborSub = '';
+    if (laborBudget != null) laborSub += `Budget: ${fmtPct(laborBudget)}`;
+    if (laborVarD != null) {
+      const over = laborVarD > 0;
+      laborSub += `<br><span style="color:${over?'var(--red)':'var(--green)'}">${over?'+':''}${fmt$(laborVarD)} ${over?'over':'under'} budget</span>`;
+    }
+    html += kpiTile({label:'Labor Cost %', value:fmtPct(laborActual), subtitle:laborSub});
+
+    // SPLH
+    const brandSales = S.computed.brandTotals[fw]?.sales || 0;
+    const brandHours = S.data.stores.reduce((sum, s) => sum + (S.computed.costs[s.name]?.[fw]?.hoursWorked || 0), 0);
+    const brandSplh = brandHours > 0 ? brandSales / brandHours : 0;
+    const splhColor = cost?.splh != null && brandSplh > 0 ? (cost.splh >= brandSplh ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
+    html += kpiTile({label:'SPLH', value:cost?.splh != null ? fmt$(cost.splh) : '—', subtitle:`Brand avg: ${fmt$(brandSplh)}<br><span style="color:${splhColor}">${cost?.splh >= brandSplh ? 'Above' : 'Below'} brand avg</span>`});
+
+    // Hours Worked
+    html += kpiTile({label:'Hours Worked', value:cost?.hoursWorked != null ? Math.round(cost.hoursWorked).toLocaleString() : '—'});
+    html += `</div>`;
+
+    // Cost narrative
+    let costNarr = '';
+    if (cost?.foodCostVariancePct != null && cost.foodCostVariancePct > 0.005) {
+      costNarr += `Food cost is running ${fmtPct(cost.foodCostVariancePct)} over budget — costing an additional ${fmt$(Math.abs(cost.foodCostVarianceDollars||0))} per week. `;
+    }
+    if (cost?.laborCostVariancePct != null && cost.laborCostVariancePct > 0.005 && laborBudget != null) {
+      costNarr += `All-in labor at ${fmtPct(laborActual)} vs ${fmtPct(laborBudget)} budget — ${fmt$(Math.abs(laborVarD||0))} over per week.`;
+    }
+    if (!costNarr) costNarr = 'Both food and labor costs are within budget thresholds.';
+    html += `<div class="cost-narrative">${costNarr}</div>`;
+    html += `</div>`;
+
+    // ── B6: Guest Health ──
+    html += `<div class="card"><div class="card-title">Guest Sentiment — ${store}</div>`;
+    if (!gh) {
+      html += `<div style="color:var(--muted);padding:10px 0">No review data available for this week.</div>`;
+    } else {
+      html += `<div class="kpi-row">`;
+      let ghSub = '';
+      if (gh.raw !== gh.smoothed) ghSub += `Raw this week: ${gh.raw}`;
+      if (gh.ptd != null) ghSub += `${ghSub ? ' · ' : ''}${gh.ptd} PTD avg`;
+      html += kpiTile({label:'Guest Score', value:`<span style="color:${guestScoreColor(gh.smoothed)}">${gh.smoothed}</span>`, subtitle:ghSub});
+      const ratingColor = gh.data.avgRating >= 4.3 ? 'var(--green)' : gh.data.avgRating >= 4.0 ? 'var(--yellow)' : 'var(--red)';
+      html += kpiTile({label:'Avg Rating', value:`<span style="color:${ratingColor}">${gh.data.avgRating.toFixed(1)}</span>`});
+      const lowPctColor = gh.data.lowPct < 0.15 ? 'var(--green)' : gh.data.lowPct < 0.25 ? 'var(--yellow)' : 'var(--red)';
+      html += kpiTile({label:'Low Reviews', value:`${gh.data.lowReviews} / ${gh.data.totalReviews}`, subtitle:`<span style="color:${lowPctColor}">${fmtPct(gh.data.lowPct)} of reviews are 1-3 stars</span>`});
+      html += `</div>`;
+
+      // Leading indicator check
+      const ghScores = [];
+      for (let i = 0; i <= 3; i++) {
+        const g = S.computed.guestHealth[store]?.[fw-i];
+        if (g?.smoothed != null) ghScores.push(g.smoothed); else break;
+      }
+      const declining = ghScores.length >= 2 && ghScores.every((s,i) => i === 0 || s <= ghScores[i-1]);
+      if (declining && gh.smoothed < 75 && ghScores.length >= 2) {
+        html += `<div class="leading-warn">⚠ Guest score has declined for ${ghScores.length} consecutive weeks (from ${ghScores[ghScores.length-1]} to ${ghScores[0]}). Historical pattern suggests order impact within 1-2 weeks.</div>`;
+      } else if (gh.smoothed >= 75) {
+        html += `<div class="leading-ok">Guest sentiment stable — no leading indicator concern.</div>`;
+      }
+
+      // 10-week guest health chart
+      const ghWeeks = S.data.availableWeeks.slice(-10);
+      html += `<div style="position:relative;height:160px;margin-top:8px"><canvas id="sc-guest-trend"></canvas></div>`;
+    }
+    html += `</div>`;
+
+    // ── B7: Period Context ──
+    if (bp) {
+      html += `<div class="card"><div class="card-title">Period Performance — ${per}</div>`;
+      html += `<div class="kpi-row">`;
+      const budgetPTD = bp.periodBudget * (bp.weeksElapsed / CONFIG.weeksPerPeriod);
+      const varColor = bp.variance >= 0 ? 'var(--green)' : 'var(--red)';
+      html += kpiTile({label:'PTD Sales', value:fmt$(bp.ptdSales), subtitle:`Budget: ${fmt$(budgetPTD)}<br><span style="color:${varColor}">Variance: ${bp.variance >= 0 ? '+' : ''}${fmt$(bp.variance)}</span>`});
+      html += kpiTile({label:'Budget Pace', value:bp.onPace ? `<span style="color:var(--green)">On Pace ✓</span>` : `<span style="color:var(--red)">Behind Pace</span>`, subtitle:bp.weeksRemaining > 0 ? `Need ${fmt$(bp.weeklyRunRateNeeded)}/week for remaining ${bp.weeksRemaining} week${bp.weeksRemaining>1?'s':''}` : 'Period complete'});
+      const pyPTD = bp.priorYearPTD;
+      const yoyPTDChg = pyPTD > 0 ? (bp.ptdSales - pyPTD) / pyPTD : null;
+      html += kpiTile({label:'Prior Year PTD', value:fmt$(pyPTD), subtitle:yoyPTDChg != null ? `<span style="color:${chgColor(yoyPTDChg)}">YoY: ${fmtChg(yoyPTDChg)}</span>` : ''});
+      html += `</div></div>`;
+    }
+
+    }
+
+  document.getElementById('content').innerHTML = html;
+
+  // Charts need to be rendered after DOM update
+  if (S.store && stores.includes(S.store)) {
+    const store = S.store;
+    const storeCountFinal = stores.length;
+    const recentWeeks = S.data.availableWeeks.slice(-6);
+    const chartLabels = recentWeeks.map(w => 'W'+w);
+    const gh = S.computed.guestHealth[store]?.[fw];
+    setTimeout(() => {
+      const storeSalesData = recentWeeks.map(w => S.computed.storeTotals[store]?.[w]?.sales || 0);
+      const brandAvgSalesData = recentWeeks.map(w => (S.computed.brandTotals[w]?.sales || 0) / storeCountFinal);
+      createTrendChart('sc-sales-trend', {
+        labels: chartLabels,
+        datasets:[
+          {label:store, data:storeSalesData, color:'var(--chart-2026)', style:'solid'},
+          {label:'Brand Avg', data:brandAvgSalesData, color:'var(--chart-brand)', style:'dashed'}
+        ],
+        yAxisFormat:'currency', showLegend:true
+      });
+      const storeOrdersData = recentWeeks.map(w => S.computed.storeTotals[store]?.[w]?.orders || 0);
+      const brandAvgOrdersData = recentWeeks.map(w => (S.computed.brandTotals[w]?.orders || 0) / storeCountFinal);
+      createTrendChart('sc-orders-trend', {
+        labels: chartLabels,
+        datasets:[
+          {label:store, data:storeOrdersData, color:'var(--chart-2026)', style:'solid'},
+          {label:'Brand Avg', data:brandAvgOrdersData, color:'var(--chart-brand)', style:'dashed'}
+        ],
+        yAxisFormat:'number', yAxisLabel:'Orders', showLegend:true
+      });
+      if (gh) {
+        const ghWeeks = S.data.availableWeeks.slice(-10);
+        const ghLabels = ghWeeks.map(w => 'W'+w);
+        const ghData = ghWeeks.map(w => S.computed.guestHealth[store]?.[w]?.smoothed ?? null);
+        createTrendChart('sc-guest-trend', {
+          labels: ghLabels,
+          datasets:[
+            {label:'Guest Score', data:ghData, color:'var(--chart-2026)', style:'solid'},
+            {label:'Green (75)', data:ghWeeks.map(()=>75), color:'var(--green)', style:'dashed'},
+            {label:'Red (60)', data:ghWeeks.map(()=>60), color:'var(--red)', style:'dashed'}
+          ],
+          yAxisFormat:'number', yAxisLabel:'Score', showLegend:true
+        });
+      }
+    }, 0);
+  }
+}
+
+function renderFinancials() {
+  const fw = S.week;
+  const per = S.data.currentPeriod;
+  const perNum = parseInt(per.replace('P', ''));
+  const stores = getStores();
+  const allStores = S.data.stores.map(s => s.name);
+  const ebitda = S.computed.ebitda[per];
+  const periodWeeks = S.data.availableWeeks.filter(w => S.data.weekToPeriod[w] === per);
+  const weeksElapsed = periodWeeks.length;
+  const totalWeeks = CONFIG.weeksPerPeriod;
+  const weeksRemaining = totalWeeks - weeksElapsed;
+
+  // Budget totals
+  const budgetTotal = S.data.budget.filter(b => b.period === perNum).reduce((s, b) => s + b.budgetSales, 0);
+  const ptdRevenue = ebitda?.revenue || 0;
+  const budgetVariance = ptdRevenue - budgetTotal * (weeksElapsed / totalWeeks);
+  const ptdPct = budgetTotal > 0 ? (ptdRevenue / budgetTotal) * 100 : 0;
+  const runRateNeeded = weeksRemaining > 0 ? (budgetTotal - ptdRevenue) / weeksRemaining : 0;
+  const onPace = ptdRevenue >= (budgetTotal / totalWeeks * weeksElapsed);
+
+  // ── Section 1: PTD Summary ──
+  let html = `<div class="card"><div class="card-title">Period-to-Date Summary — ${per} · ${weeksElapsed} of ${totalWeeks} weeks</div>`;
+  html += `<div class="kpi-row">`;
+  html += kpiTile({label:'PTD Revenue', value:fmt$(ptdRevenue), size:'large'});
+  html += kpiTile({label:'Budget', value:fmt$(budgetTotal), subtitle:`Variance: <span style="color:${budgetVariance >= 0 ? 'var(--green)' : 'var(--red)'}"> ${budgetVariance >= 0 ? '+' : ''}${fmt$(budgetVariance)}</span>`});
+  if (onPace) {
+    html += kpiTile({label:'Run Rate Status', value:'<span style="color:var(--green)">On Pace ✓</span>'});
+  } else {
+    html += kpiTile({label:'Weekly Run Rate Needed', value:fmt$(runRateNeeded), subtitle:'to hit period budget'});
+  }
+  html += kpiTile({label:'Food Cost % (PTD)', value:fmtPct(ebitda?.revenue > 0 ? ebitda.foodCost / ebitda.revenue : 0)});
+  html += kpiTile({label:'All-In Labor % (PTD)', value:fmtPct(ebitda?.revenue > 0 ? ebitda.allInLabor / ebitda.revenue : 0)});
+  html += `</div>`;
+  // Progress bar
+  html += `<div class="budget-progress"><div class="budget-progress-fill" style="width:${Math.min(100, ptdPct)}%"></div></div>`;
+  html += `<div class="budget-progress-label">${fmtPct(ptdPct / 100)} of period budget · ${weeksRemaining} week${weeksRemaining !== 1 ? 's' : ''} remaining</div>`;
+  html += `</div>`;
+
+  // ── Section 2: Store PTD Table ──
+  html += `<div class="card"><div class="card-title">Store PTD Performance — ${per}</div>`;
+  const storeRows = stores.map(store => {
+    const bp = S.computed.budgetPacing[store];
+    if (!bp) return null;
+    const proratedBudget = bp.periodBudget * (weeksElapsed / totalWeeks);
+    const variance = bp.ptdSales - proratedBudget;
+    const variancePct = proratedBudget > 0 ? variance / proratedBudget : 0;
+    const projectedSales = weeksElapsed > 0 ? (bp.ptdSales / weeksElapsed) * totalWeeks : 0;
+    const storeOnPace = projectedSales >= bp.periodBudget;
+    const pyPTD = bp.priorYearPTD || 0;
+    const yoy = pyPTD > 0 ? (bp.ptdSales - pyPTD) / pyPTD : null;
+    return {store, district:storeDistrict(store), ptdSales:bp.ptdSales, periodBudget:bp.periodBudget, variance, variancePct, onPace:storeOnPace, priorYearPTD:pyPTD, yoy};
+  }).filter(Boolean);
+
+  html += sortableTable({
+    id:'fin-ptd', headers:[
+      {key:'store',label:'Store',width:'130px'},
+      {key:'district',label:'District',width:'70px'},
+      {key:'ptdSales',label:'PTD Sales',format:'currency',sortable:true},
+      {key:'periodBudget',label:'Period Budget',format:'currency',sortable:true},
+      {key:'variance',label:'Variance $',format:'currency',sortable:true},
+      {key:'variancePct',label:'Variance %',format:'changePct',sortable:true},
+      {key:'onPace',label:'On Pace'},
+      {key:'priorYearPTD',label:'PY PTD',format:'currency',sortable:true},
+      {key:'yoy',label:'YoY',format:'changePct',sortable:true}
+    ],
+    rows: storeRows.map(r => ({...r, onPace: r.onPace ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>'})),
+    groupBy:'district', groupOrder:Object.keys(CONFIG.districts),
+    defaultSort:{key:'variance',dir:'asc'}
+  });
+  html += '</div>';
+
+  // ── Section 3: Cost Trends ──
+  html += `<div class="chart-row">`;
+  html += `<div class="card"><div class="card-title">Food Cost % Trend — Last 6 Weeks</div>`;
+  html += `<div style="position:relative;height:200px"><canvas id="fin-food-trend"></canvas></div></div>`;
+  html += `<div class="card"><div class="card-title">Labor Cost % Trend — Last 6 Weeks</div>`;
+  html += `<div style="position:relative;height:200px"><canvas id="fin-labor-trend"></canvas></div></div>`;
+  html += `</div>`;
+
+  // ── Section 4: Period Cost Envelope ──
+  if (weeksRemaining > 0) {
+    html += `<div class="card"><div class="card-title">Period Cost Envelope — ${per} · ${weeksRemaining} week${weeksRemaining !== 1 ? 's' : ''} remaining</div>`;
+    const envelopeRows = stores.map(store => {
+      const budgetRow = S.data.budget.find(b => b.store === store && b.period === perNum);
+      if (!budgetRow) return null;
+      const bp = S.computed.budgetPacing[store];
+      if (!bp) return null;
+      const remainingBudgetRev = budgetRow.budgetSales - bp.ptdSales;
+      // Food cost envelope
+      const ptdFcDollars = periodWeeks.reduce((s, w) => {
+        const c = S.computed.costs[store]?.[w];
+        const st = S.computed.storeTotals[store]?.[w];
+        return s + (c?.foodCostPct != null && st ? c.foodCostPct * st.sales : 0);
+      }, 0);
+      const fcAllowedTotal = budgetRow.budgetSales * budgetRow.budgetFoodCostPct;
+      const fcRemainingAllowed = fcAllowedTotal - ptdFcDollars;
+      const canRunFC = remainingBudgetRev > 0 ? fcRemainingAllowed / remainingBudgetRev : null;
+      const fcHeadroom = canRunFC != null ? canRunFC - budgetRow.budgetFoodCostPct : null;
+      // Labor cost envelope
+      const ptdLaborDollars = periodWeeks.reduce((s, w) => {
+        const c = S.computed.costs[store]?.[w];
+        const st = S.computed.storeTotals[store]?.[w];
+        return s + (c?.laborCostPct != null && st ? c.laborCostPct * st.sales : 0);
+      }, 0);
+      const blp = budgetRow.budgetAllInLaborPct || budgetRow.budgetLaborPct;
+      const laborAllowedTotal = budgetRow.budgetSales * blp;
+      const laborRemainingAllowed = laborAllowedTotal - ptdLaborDollars;
+      const canRunLabor = remainingBudgetRev > 0 ? laborRemainingAllowed / remainingBudgetRev : null;
+      const laborHeadroom = canRunLabor != null ? canRunLabor - blp : null;
+      return {store, ptdSales:bp.ptdSales, remainingBudget:remainingBudgetRev,
+        canRunFC, budgetFC:budgetRow.budgetFoodCostPct, fcHeadroom,
+        canRunLabor, budgetLabor:blp, laborHeadroom};
+    }).filter(Boolean);
+
+    html += `<div class="table-wrap"><table class="data-table" id="fin-envelope"><thead><tr>`;
+    html += `<th>Store</th><th>PTD Sales</th><th>Remaining Budget</th><th>Food: Can Run</th><th>Budget FC%</th><th>Headroom</th><th>Labor: Can Run</th><th>Budget Labor%</th><th>Headroom</th>`;
+    html += `</tr></thead><tbody>`;
+    envelopeRows.sort((a, b) => (a.fcHeadroom || 0) - (b.fcHeadroom || 0));
+    envelopeRows.forEach(r => {
+      const fcStr = r.canRunFC != null && r.canRunFC > 0 ? fmtPct(r.canRunFC) : '<span style="color:var(--red);font-weight:600">Overrun</span>';
+      const lStr = r.canRunLabor != null && r.canRunLabor > 0 ? fmtPct(r.canRunLabor) : '<span style="color:var(--red);font-weight:600">Overrun</span>';
+      const fcHClass = r.fcHeadroom != null && r.fcHeadroom >= 0 ? 'headroom-pos' : 'headroom-neg';
+      const lHClass = r.laborHeadroom != null && r.laborHeadroom >= 0 ? 'headroom-pos' : 'headroom-neg';
+      html += `<tr>`;
+      html += `<td>${r.store}</td><td>${fmt$(r.ptdSales)}</td><td>${fmt$(r.remainingBudget)}</td>`;
+      html += `<td>${fcStr}</td><td>${fmtPct(r.budgetFC)}</td><td class="${fcHClass}">${r.fcHeadroom != null ? (r.fcHeadroom >= 0 ? '+' : '') + (r.fcHeadroom * 100).toFixed(1) + ' pts' : '—'}</td>`;
+      html += `<td>${lStr}</td><td>${fmtPct(r.budgetLabor)}</td><td class="${lHClass}">${r.laborHeadroom != null ? (r.laborHeadroom >= 0 ? '+' : '') + (r.laborHeadroom * 100).toFixed(1) + ' pts' : '—'}</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  } else {
+    html += `<div class="card"><div class="card-title">Period Cost Envelope</div><div style="padding:12px;color:var(--muted)">Period complete — no remaining weeks for cost envelope.</div></div>`;
+  }
+
+  // ── Section 5: EBITDA Waterfall ──
+  html += `<div class="card"><div class="card-title">Four-Wall EBITDA Waterfall — ${per} PTD</div>`;
+  html += `<div style="position:relative;height:280px"><canvas id="fin-waterfall"></canvas></div>`;
+  if (ebitda && ebitda.revenue > 0) {
+    const fc = ebitda.foodCost;
+    const labor = ebitda.allInLabor;
+    const remainder = ebitda.revenue - fc - labor;
+    const estEbitdaPct = ebitda.budgetEbitdaPct || 0;
+    const estEbitda = estEbitdaPct > 0 ? ebitda.revenue * estEbitdaPct : null;
+    const estOther = estEbitda != null ? remainder - estEbitda : null;
+    html += `<div class="waterfall-summary">`;
+    html += `<span>Revenue: ${fmt$(ebitda.revenue)}</span>`;
+    html += `<span>Food: ${fmt$(fc)} (${fmtPct(fc / ebitda.revenue)})</span>`;
+    html += `<span>Labor: ${fmt$(labor)} (${fmtPct(labor / ebitda.revenue)})</span>`;
+    if (estOther != null) {
+      html += `<span>Other (est): ${fmt$(estOther)} (${fmtPct(estOther / ebitda.revenue)})</span>`;
+      html += `<span>EBITDA (est): ${fmt$(estEbitda)} (${fmtPct(estEbitdaPct)})</span>`;
+    } else {
+      html += `<span>Remainder: ${fmt$(remainder)} (${fmtPct(remainder / ebitda.revenue)})</span>`;
+    }
+    html += `<span style="color:var(--muted)">Budget EBITDA: ${fmtPct(ebitda.budgetEbitdaPct)}</span>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  document.getElementById('content').innerHTML = html;
+
+  // ── Render Charts ──
+  setTimeout(() => {
+    const recentWeeks = S.data.availableWeeks.slice(-6);
+    const wLabels = recentWeeks.map(w => 'W' + w);
+
+    // Food cost trend
+    const fcData = recentWeeks.map(w => getSalesWeightedCost(allStores, w, 'foodCostPct'));
+    const budgetFcAvg = (() => {
+      const bRows = S.data.budget.filter(b => b.period === perNum && b.budgetFoodCostPct > 0);
+      if (!bRows.length) return null;
+      let totalBudgetDollars = 0, totalBudgetSales = 0;
+      bRows.forEach(b => { totalBudgetDollars += b.budgetFoodCostPct * b.budgetSales; totalBudgetSales += b.budgetSales; });
+      return totalBudgetSales > 0 ? totalBudgetDollars / totalBudgetSales : null;
+    })();
+    const fcDatasets = [{label:'Food Cost %', data:fcData, color:'var(--chart-2026)', style:'solid'}];
+    if (budgetFcAvg != null) fcDatasets.push({label:'Budget', data:recentWeeks.map(() => budgetFcAvg), color:'var(--chart-budget)', style:'dashed'});
+    createTrendChart('fin-food-trend', {labels:wLabels, datasets:fcDatasets, yAxisFormat:'percent', showLegend:true});
+
+    // Labor cost trend
+    const lcData = recentWeeks.map(w => getSalesWeightedCost(allStores, w, 'laborCostPct'));
+    const budgetLcAvg = (() => {
+      const bRows = S.data.budget.filter(b => b.period === perNum && (b.budgetAllInLaborPct > 0 || b.budgetLaborPct > 0));
+      if (!bRows.length) return null;
+      let totalBudgetDollars = 0, totalBudgetSales = 0;
+      bRows.forEach(b => { const blp = b.budgetAllInLaborPct || b.budgetLaborPct; totalBudgetDollars += blp * b.budgetSales; totalBudgetSales += b.budgetSales; });
+      return totalBudgetSales > 0 ? totalBudgetDollars / totalBudgetSales : null;
+    })();
+    const lcDatasets = [{label:'Labor Cost %', data:lcData, color:'var(--chart-2026)', style:'solid'}];
+    if (budgetLcAvg != null) lcDatasets.push({label:'Budget', data:recentWeeks.map(() => budgetLcAvg), color:'var(--chart-budget)', style:'dashed'});
+    createTrendChart('fin-labor-trend', {labels:wLabels, datasets:lcDatasets, yAxisFormat:'percent', showLegend:true});
+
+    // EBITDA Waterfall
+    if (ebitda && ebitda.revenue > 0) {
+      const revenue = ebitda.revenue;
+      const food = ebitda.foodCost;
+      const labor = ebitda.allInLabor;
+      // Estimate EBITDA using budget EBITDA % (since Other Controllable not in data)
+      const estEbitdaPct = ebitda.budgetEbitdaPct || 0;
+      const remainder = revenue - food - labor;
+      // If we have a budget EBITDA %, use it to estimate Other; otherwise show 3-bar
+      const hasBudgetEbitda = estEbitdaPct > 0;
+      let waterfallLabels, waterfallSpacers, waterfallValues, waterfallColors;
+      if (hasBudgetEbitda) {
+        const estEbitda = revenue * estEbitdaPct;
+        const estOther = remainder - estEbitda;
+        waterfallLabels = ['Revenue', 'Food Cost', 'All-In Labor', 'Other (est)', 'EBITDA (est)'];
+        waterfallSpacers = [0, revenue - food, revenue - food - labor, revenue - food - labor - Math.max(0, estOther), 0];
+        waterfallValues = [revenue, food, labor, Math.max(0, estOther), Math.max(0, estEbitda)];
+        waterfallColors = [resolveColor('var(--gold)'), resolveColor('var(--red)'), resolveColor('var(--red)'), resolveColor('var(--yellow)'), resolveColor('var(--green)')];
+      } else {
+        waterfallLabels = ['Revenue', 'Food Cost', 'All-In Labor', 'Remainder'];
+        waterfallSpacers = [0, revenue - food, revenue - food - labor, 0];
+        waterfallValues = [revenue, food, labor, remainder];
+        waterfallColors = [resolveColor('var(--gold)'), resolveColor('var(--red)'), resolveColor('var(--red)'), resolveColor('var(--green)')];
+      }
+
+      destroyChart('fin-waterfall');
+      const ctx = document.getElementById('fin-waterfall');
+      if (ctx) {
+        _charts['fin-waterfall'] = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: waterfallLabels,
+            datasets: [
+              { label: 'Spacer', data: waterfallSpacers, backgroundColor: 'transparent', borderWidth: 0, barPercentage: 0.6 },
+              { label: 'Value', data: waterfallValues, backgroundColor: waterfallColors, borderRadius: 3, barPercentage: 0.6 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { filter: item => item.datasetIndex === 1, callbacks: { label: c => fmt$(c.raw) } }
+            },
+            scales: {
+              x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Calibri', size: 11 } } },
+              y: { stacked: true, grid: { color: '#E8E0D822' }, ticks: { font: { family: 'Calibri', size: 11 }, callback: v => fmt$(v) } }
+            }
+          }
+        });
+      }
+    }
+  }, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MENU INTELLIGENCE HELPERS
+   ═══════════════════════════════════════════════════════════════════ */
+function classifyItemLocal(name) {
+  const lc = name.toLowerCase();
+  for (const [cat, keywords] of Object.entries(CONFIG.itemClassifier)) {
+    if (keywords.some(kw => lc.includes(kw))) return cat;
+  }
+  return 'UNCATEGORIZED';
+}
+function getPlateType(itemName) {
+  const lc = itemName.toLowerCase();
+  if (lc.includes('1 meat') || lc.includes('1m') || lc.includes('sun special')) return '1M';
+  if (lc.includes('r&r plate') || lc.includes('r&r two')) return 'RR';
+  if (lc.includes('3 meat') || lc.includes('3m')) return '3M';
+  if (lc.includes('2 meat') || lc.includes('2m')) return '2M';
+  return null;
+}
+function getBrisketTier(modifierName) {
+  const lc = modifierName.toLowerCase();
+  if (lc.includes('-1m') || lc.includes('1m')) return '1M';
+  if (lc.includes('-3m') || lc.includes('3m')) return '3M';
+  if (lc.includes('-2m') || lc.includes('2m') || lc.includes('c-2')) return '2M';
+  return null;
+}
+
+function renderMenu() {
+  const fw = S.week;
+  const hasWeekly = S.features.hasPmixWeekly;
+  const view = S.menuView;
+  let items26, items25, viewLabel, compLabel;
+
+  if (view === 'Period' || !hasWeekly) {
+    const p = S.menuPeriod || S.data.currentPeriod;
+    items26 = S.data.pmixPeriod2026.filter(r => r.period === p);
+    items25 = S.data.pmixPeriod2025.filter(r => r.period === p);
+    viewLabel = `Period ${p}`;
+    compLabel = `${p} 2026 vs ${p} 2025`;
+  } else {
+    items26 = S.data.pmixWeekly2026.filter(r => r.fw === fw);
+    items25 = S.data.pmixWeekly2025.filter(r => r.fw === fw);
+    viewLabel = `Week ${fw}`;
+    compLabel = `W${fw} 2026 vs W${fw} 2025`;
+  }
+
+  const total26 = items26.reduce((s, r) => s + r.totalSales, 0);
+  const total25 = items25.reduce((s, r) => s + r.totalSales, 0);
+
+  // ── Toggle bar + period selector ──
+  let html = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">`;
+  if (hasWeekly) {
+    html += `<div class="menu-toggle">`;
+    html += `<button class="${view==='Period'?'active':''}" onclick="S.menuView='Period';renderMenu()">Period</button>`;
+    html += `<button class="${view==='Weekly'?'active':''}" onclick="S.menuView='Weekly';renderMenu()">Weekly</button>`;
+    html += `</div>`;
+  }
+  if (view === 'Period' || !hasWeekly) {
+    html += `<select class="period-sel" onchange="S.menuPeriod=this.value;renderMenu()">`;
+    S.data.availablePeriods.forEach(p => {
+      html += `<option value="${p}" ${p===(S.menuPeriod||S.data.currentPeriod)?'selected':''}>${p}</option>`;
+    });
+    html += `</select>`;
+  }
+  html += `<span style="font-size:14px;font-weight:600;color:var(--text)">Menu Intelligence — ${viewLabel}</span>`;
+  html += `</div>`;
+
+  // ════════════════════════════════════════
+  // Section 1: Revenue Architecture
+  // ════════════════════════════════════════
+  html += `<div class="card menu-section"><div class="card-title">Revenue Architecture — ${compLabel}</div>`;
+  const totalChg = total25 > 0 ? (total26 - total25)/total25 : null;
+  html += `<div style="font-size:13px;margin-bottom:10px;color:var(--text)">Total Revenue: ${fmt$(total26)} vs ${fmt$(total25)} (<span style="color:${chgColor(totalChg)}">${fmtChg(totalChg)}</span>)</div>`;
+
+  // Classify and group
+  const catMap26 = {}, catMap25 = {};
+  items26.forEach(r => { const c = classifyItemLocal(r.item); if (!catMap26[c]) catMap26[c]={sales:0,qty:0}; catMap26[c].sales+=r.totalSales; catMap26[c].qty+=r.qty; });
+  items25.forEach(r => { const c = classifyItemLocal(r.item); if (!catMap25[c]) catMap25[c]={sales:0,qty:0}; catMap25[c].sales+=r.totalSales; catMap25[c].qty+=r.qty; });
+
+  const archCats = Object.keys(catMap26).filter(k => k!=='UNCATEGORIZED' && k!=='MODIFIER' && k!=='NON_FOOD')
+    .sort((a,b) => catMap26[b].sales - catMap26[a].sales);
+
+  html += sortableTable({
+    id:'menu-arch-full', headers:[
+      {key:'category',label:'Category',width:'160px'},
+      {key:'sales26',label:'2026 Sales',format:'currency',sortable:true},
+      {key:'share26',label:'2026 Share',format:'percent',sortable:true},
+      {key:'sales25',label:'2025 Sales',format:'currency',sortable:true},
+      {key:'share25',label:'2025 Share',format:'percent',sortable:true},
+      {key:'shift',label:'Share Shift',format:'changePct',sortable:true}
+    ],
+    rows: archCats.map(cat => {
+      const s26 = catMap26[cat]?.sales||0, s25 = catMap25[cat]?.sales||0;
+      const sh26 = total26>0 ? s26/total26 : 0, sh25 = total25>0 ? s25/total25 : 0;
+      const shift = sh26 - sh25;
+      return {
+        category: cat.replace(/_/g,' '),
+        sales26: s26, share26: sh26,
+        sales25: s25 > 0 ? s25 : null, share25: s25 > 0 ? sh25 : null,
+        shift: s25 > 0 ? shift : null,
+        _shiftRaw: shift
+      };
+    }),
+    defaultSort:{key:'sales26',dir:'desc'}
+  });
+  // Patch shift column coloring via post-processing
+  html += `</div>`;
+
+  // ════════════════════════════════════════
+  // Section 2: Plate Type Migration
+  // ════════════════════════════════════════
+  html += `<div class="card menu-section"><div class="card-title">Plate Type Migration — ${compLabel}</div>`;
+
+  function getPlateData(items) {
+    const tiers = {}, totalUnits = {qty:0};
+    items.forEach(r => {
+      if (classifyItemLocal(r.item) !== 'ENTREE_PLATE') return;
+      const t = getPlateType(r.item);
+      if (!t) return;
+      if (!tiers[t]) tiers[t] = {qty:0, sales:0};
+      tiers[t].qty += r.qty; tiers[t].sales += r.totalSales;
+      totalUnits.qty += r.qty;
+    });
+    return {tiers, totalQty: totalUnits.qty};
+  }
+
+  const plate26 = getPlateData(items26), plate25 = getPlateData(items25);
+  const plateOrder = ['1M','2M','3M','RR'];
+  const plateLabels = {'1M':'1 Meat','2M':'2 Meat','3M':'3 Meat','RR':'R&R Plate'};
+  const plateColors = {'1M':'#C4922A','2M':'#5C3D2E','3M':'#8B2500','RR':'#2D8F4E'};
+
+  // Stacked bar chart
+  html += `<div style="position:relative;height:120px"><canvas id="chart-plate-migration"></canvas></div>`;
+
+  // Comparison table
+  html += `<div class="table-wrap" style="margin-top:12px"><table class="data-table"><thead><tr>`;
+  html += `<th>Plate Type</th><th>2026 Units</th><th>2026 Share</th><th>2025 Units</th><th>2025 Share</th><th>Share Shift</th>`;
+  html += `</tr></thead><tbody>`;
+  plateOrder.forEach(t => {
+    const d26 = plate26.tiers[t], d25 = plate25.tiers[t];
+    const u26 = d26?.qty||0, u25 = d25?.qty||0;
+    const sh26 = plate26.totalQty > 0 ? u26/plate26.totalQty : 0;
+    const sh25 = plate25.totalQty > 0 ? u25/plate25.totalQty : 0;
+    const shift = (sh25 > 0 || sh26 > 0) ? sh26 - sh25 : null;
+    const shiftStr = shift != null ? `<span style="color:${shift>=0?'var(--green)':'var(--red)'}">${shift>=0?'▲':'▼'} ${shift>=0?'+':''}${(shift*100).toFixed(1)}%</span>` : '—';
+    html += `<tr><td><span class="plate-swatch" style="background:${plateColors[t]}"></span>${plateLabels[t]}</td>`;
+    html += `<td>${u26.toLocaleString()}</td><td>${fmtPct(sh26)}</td>`;
+    html += `<td>${u25 > 0 ? u25.toLocaleString() : '—'}</td><td>${u25 > 0 ? fmtPct(sh25) : '—'}</td>`;
+    html += `<td>${shiftStr}</td></tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+
+  // ════════════════════════════════════════
+  // Section 3: Brisket Attachment & Upcharge Revenue
+  // ════════════════════════════════════════
+  html += `<div class="card menu-section"><div class="card-title">Brisket Attachment & Upcharge Revenue — ${compLabel}</div>`;
+
+  function getBrisketData(items) {
+    let brisketQty = 0, brisketSales = 0, plateQty = 0;
+    const tierData = {};
+    const tierPlateQty = {};
+    items.forEach(r => {
+      const cat = classifyItemLocal(r.item);
+      if (cat === 'ENTREE_PLATE') {
+        plateQty += r.qty;
+        const pt = getPlateType(r.item);
+        if (pt) { tierPlateQty[pt] = (tierPlateQty[pt]||0) + r.qty; }
+      }
+      if (cat === 'MODIFIER' && r.item.toLowerCase().includes('brisket')) {
+        brisketQty += r.qty; brisketSales += r.totalSales;
+        const bt = getBrisketTier(r.item);
+        if (bt) {
+          if (!tierData[bt]) tierData[bt] = {qty:0, sales:0};
+          tierData[bt].qty += r.qty; tierData[bt].sales += r.totalSales;
+        }
+      }
+    });
+    return {brisketQty, brisketSales, plateQty, attachRate: plateQty>0 ? brisketQty/plateQty : 0, revPerSelection: brisketQty>0 ? brisketSales/brisketQty : 0, tierData, tierPlateQty};
+  }
+
+  const brk26 = getBrisketData(items26), brk25 = getBrisketData(items25);
+
+  html += `<div class="kpi-row">`;
+  html += kpiTile({label:'Brisket Attachment Rate', value:fmtPct(brk26.attachRate), subtitle: brk25.plateQty > 0 ? `2025: ${fmtPct(brk25.attachRate)}` : ''});
+  const upchargeChg = brk25.brisketSales > 0 ? (brk26.brisketSales - brk25.brisketSales)/brk25.brisketSales : null;
+  html += kpiTile({label:'Upcharge Revenue', value:fmt$(brk26.brisketSales), yoyChange: upchargeChg, subtitle: brk25.brisketSales > 0 ? `2025: ${fmt$(brk25.brisketSales)}` : ''});
+  html += kpiTile({label:'Effective Rev / Selection', value: brk26.brisketQty > 0 ? '$'+brk26.revPerSelection.toFixed(2) : '—', subtitle: brk25.brisketQty > 0 ? `2025: $${brk25.revPerSelection.toFixed(2)}` : ''});
+  html += `</div>`;
+
+  // Tier breakdown
+  const brkTiers = ['1M','2M','3M'];
+  html += `<div class="table-wrap" style="margin-top:10px"><table class="data-table"><thead><tr>`;
+  html += `<th>Plate Tier</th><th>Brisket Selections</th><th>Total Plates</th><th>Attach Rate</th><th>2025 Rate</th><th>Change</th>`;
+  html += `</tr></thead><tbody>`;
+  brkTiers.forEach(t => {
+    const bd26 = brk26.tierData[t], bd25 = brk25.tierData[t];
+    const sel26 = bd26?.qty||0, pq26 = brk26.tierPlateQty[t]||0;
+    const sel25 = bd25?.qty||0, pq25 = brk25.tierPlateQty[t]||0;
+    const rate26 = pq26 > 0 ? sel26/pq26 : 0, rate25 = pq25 > 0 ? sel25/pq25 : 0;
+    const chg = (rate25 > 0 || rate26 > 0) ? rate26 - rate25 : null;
+    const chgStr = chg != null ? `<span style="color:${chg>=0?'var(--green)':'var(--red)'}">${chg>=0?'▲':'▼'} ${chg>=0?'+':''}${(chg*100).toFixed(1)}%</span>` : '—';
+    html += `<tr><td>${plateLabels[t]||t}</td><td>${sel26.toLocaleString()}</td><td>${pq26.toLocaleString()}</td>`;
+    html += `<td>${fmtPct(rate26)}</td><td>${pq25>0?fmtPct(rate25):'—'}</td><td>${chgStr}</td></tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+
+  // ════════════════════════════════════════
+  // Section 4: Attachment Rate Trends (Weekly only)
+  // ════════════════════════════════════════
+  html += `<div class="card menu-section"><div class="card-title">Attachment Rate Trends — Weekly</div>`;
+  if (!hasWeekly) {
+    html += `<p style="color:var(--muted);font-size:12px;padding:12px 0">Weekly PMIX data required for attachment rate trends. Add Brink_Pmix_Weekly_2026 and Brink_Pmix_Weekly_2025 tabs to enable this view.</p>`;
+  } else {
+    const attRates = S.computed.pmix.attachmentRates;
+    const attWeeks = Object.keys(attRates).map(Number).sort((a,b)=>a-b);
+    const currAtt = attRates[fw];
+    const prevAtt = attRates[fw-1];
+
+    html += `<div class="kpi-row">`;
+    html += kpiTile({label:'Side Attach Rate', value: currAtt ? fmtPct(currAtt.sideRate) : '—', subtitle: prevAtt ? `Prior: ${fmtPct(prevAtt.sideRate)}` : ''});
+    html += kpiTile({label:'Dessert Attach Rate', value: currAtt ? fmtPct(currAtt.dessertRate) : '—', subtitle: prevAtt ? `Prior: ${fmtPct(prevAtt.dessertRate)}` : (currAtt ? `Each 1% ≈ $${Math.round(currAtt.entreeCount*0.01*4.5)}/wk` : '')});
+    html += kpiTile({label:'Drink Attach Rate', value: currAtt ? fmtPct(currAtt.drinkRate) : '—', subtitle: prevAtt ? `Prior: ${fmtPct(prevAtt.drinkRate)}` : ''});
+    html += kpiTile({label:'Entree Count', value: currAtt ? currAtt.entreeCount.toLocaleString() : '—', subtitle:`Week ${fw}`});
+    html += `</div>`;
+
+    // Three separate trend charts
+    html += `<div class="chart-row" style="display:flex;gap:12px">`;
+    html += `<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Side Attachment</div><div style="position:relative;height:150px"><canvas id="chart-side-attach"></canvas></div></div>`;
+    html += `<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Dessert Attachment</div><div style="position:relative;height:150px"><canvas id="chart-dessert-attach"></canvas></div></div>`;
+    html += `<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Drink Attachment</div><div style="position:relative;height:150px"><canvas id="chart-drink-attach"></canvas></div></div>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // ════════════════════════════════════════
+  // Section 5: Value Menu Monitor
+  // ════════════════════════════════════════
+  const vm = S.computed.pmix.valueMix;
+  const plateShareTrend = vm?.plateShareTrend || [];
+  const valueShareTrend = vm?.valueShareTrend || [];
+
+  html += `<div class="card menu-section"><div class="card-title">Value Menu Monitor — Cannibalization Watch</div>`;
+  if (!hasWeekly || plateShareTrend.length === 0) {
+    html += `<p style="color:var(--muted);font-size:12px;padding:12px 0">Weekly PMIX data required for value menu monitoring.</p>`;
+  } else {
+    html += `<div style="position:relative;height:180px"><canvas id="chart-value-cannibalize"></canvas></div>`;
+    // Build narrative
+    const latestPlate = plateShareTrend[plateShareTrend.length - 1];
+    const firstPlate = plateShareTrend[0];
+    const latestValue = valueShareTrend[valueShareTrend.length - 1];
+    const plateShift = latestPlate.share - firstPlate.share;
+    let narrative;
+    if (Math.abs(plateShift) < 0.003) {
+      narrative = `Plate share stable at ${fmtPct(latestPlate.share)} while value menu holds ${fmtPct(latestValue.share)} — no cannibalization detected.`;
+    } else if (plateShift < -0.003) {
+      narrative = `⚠ Plate share declined from ${fmtPct(firstPlate.share)} to ${fmtPct(latestPlate.share)} (${(plateShift*100).toFixed(1)} pts) as value menu grew to ${fmtPct(latestValue.share)}. Monitor for cannibalization.`;
+    } else {
+      narrative = `Plate share grew from ${fmtPct(firstPlate.share)} to ${fmtPct(latestPlate.share)} alongside value menu at ${fmtPct(latestValue.share)} — both growing, healthy sign.`;
+    }
+    html += `<div class="cannibal-narrative">${narrative}</div>`;
+  }
+  html += `</div>`;
+
+  // ════════════════════════════════════════
+  // Section 6: Top 20 Items Comparison
+  // ════════════════════════════════════════
+  html += `<div class="card menu-section"><div class="card-title">Top 20 Items — ${compLabel}</div>`;
+
+  const sorted26 = [...items26].sort((a,b) => b.totalSales - a.totalSales).slice(0,20);
+  const items25Map = {};
+  items25.forEach(r => { items25Map[r.item.trim().toLowerCase()] = r; });
+
+  html += `<div class="table-wrap"><table class="data-table"><thead><tr>`;
+  html += `<th style="width:30px">#</th><th>Item</th><th>Category</th><th style="text-align:right">2026 Sales</th><th style="text-align:right">2026 Qty</th><th style="text-align:right">Avg Price</th><th style="text-align:right">2025 Sales</th><th style="text-align:right">2025 Qty</th><th style="text-align:right">Sales Δ%</th><th style="text-align:right">Mix Shift</th>`;
+  html += `</tr></thead><tbody>`;
+
+  sorted26.forEach((r, i) => {
+    const cat = classifyItemLocal(r.item);
+    const catLabel = cat.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bAnd\b/g,'and');
+    const match25 = items25Map[r.item.trim().toLowerCase()];
+    const sh26 = total26 > 0 ? r.totalSales / total26 : 0;
+    const sh25 = match25 && total25 > 0 ? match25.totalSales / total25 : null;
+    const salesChg = match25 && match25.totalSales > 0 ? (r.totalSales - match25.totalSales)/match25.totalSales : null;
+    const mixShift = sh25 != null ? sh26 - sh25 : null;
+    const mixStr = mixShift != null ? `<span style="color:${mixShift>=0?'var(--green)':'var(--red)'}"> ${mixShift>=0?'+':''}${(mixShift*100).toFixed(1)} pts</span>` : '';
+    const bg = i % 2 === 1 ? ` style="background:var(--card2)"` : '';
+
+    html += `<tr${bg}>`;
+    html += `<td>${i+1}</td>`;
+    html += `<td>${r.item}</td>`;
+    html += `<td><span style="font-size:11px;color:var(--muted)">${catLabel}</span></td>`;
+    html += `<td style="text-align:right">${fmt$(r.totalSales)}</td>`;
+    html += `<td style="text-align:right">${r.qty.toLocaleString()}</td>`;
+    html += `<td style="text-align:right">$${r.avgPrice.toFixed(2)}</td>`;
+    if (match25) {
+      html += `<td style="text-align:right">${fmt$(match25.totalSales)}</td>`;
+      html += `<td style="text-align:right">${match25.qty.toLocaleString()}</td>`;
+      html += `<td style="text-align:right"><span style="color:${chgColor(salesChg)}">${chgArrow(salesChg)} ${fmtChg(salesChg)}</span></td>`;
+    } else {
+      html += `<td style="text-align:right"><span class="new-badge">NEW</span></td>`;
+      html += `<td style="text-align:right"><span class="new-badge">NEW</span></td>`;
+      html += `<td style="text-align:right">—</td>`;
+    }
+    html += `<td style="text-align:right">${mixStr || '—'}</td>`;
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div></div>`;
+
+  // ── Render to DOM ──
+  document.getElementById('content').innerHTML = html;
+
+  // ── Post-render: create charts ──
+  setTimeout(() => {
+    // Plate migration stacked bar
+    if (document.getElementById('chart-plate-migration')) {
+      destroyChart('chart-plate-migration');
+      const ctx = document.getElementById('chart-plate-migration');
+      if (ctx) {
+        const datasets = plateOrder.map(t => ({
+          label: plateLabels[t],
+          data: [
+            plate26.totalQty > 0 ? ((plate26.tiers[t]?.qty||0)/plate26.totalQty)*100 : 0,
+            plate25.totalQty > 0 ? ((plate25.tiers[t]?.qty||0)/plate25.totalQty)*100 : 0
+          ],
+          backgroundColor: plateColors[t] + (plateOrder.indexOf(t) >= 0 ? '' : ''),
+          barPercentage: 0.6
+        }));
+        // Make 2025 bars slightly lighter
+        const datasets2 = plateOrder.map((t,ti) => ({
+          label: plateLabels[t],
+          data: [
+            plate26.totalQty > 0 ? ((plate26.tiers[t]?.qty||0)/plate26.totalQty)*100 : 0,
+            plate25.totalQty > 0 ? ((plate25.tiers[t]?.qty||0)/plate25.totalQty)*100 : 0
+          ],
+          backgroundColor: [plateColors[t], plateColors[t]+'99'],
+          barPercentage: 0.6
+        }));
+        _charts['chart-plate-migration'] = new Chart(ctx, {
+          type: 'bar',
+          data: { labels: ['2026','2025'], datasets: datasets2 },
+          options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: true, position:'bottom', labels:{font:{family:'Calibri',size:11}, boxWidth:14, padding:10} },
+              tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.parsed.x.toFixed(1) + '%' } }
+            },
+            scales: {
+              x: { stacked: true, grid:{display:true, color:'#E8E0D822'}, ticks:{font:{family:'Calibri',size:11}, callback: v => v+'%'}, max:100 },
+              y: { stacked: true, grid:{display:false}, ticks:{font:{family:'Calibri',size:12,weight:'bold'}} }
+            }
+          }
+        });
+      }
+    }
+
+    // Attachment rate trend charts (if weekly data)
+    if (hasWeekly) {
+      const attRates = S.computed.pmix.attachmentRates;
+      const attWeeks = Object.keys(attRates).map(Number).sort((a,b)=>a-b);
+      const labels = attWeeks.map(w => 'W'+w);
+
+      if (document.getElementById('chart-side-attach')) {
+        createTrendChart('chart-side-attach', {
+          labels, showLegend:false, yAxisFormat:'percent',
+          datasets:[{label:'Side Rate', data:attWeeks.map(w=>attRates[w].sideRate), color:'var(--gold)', style:'solid'}]
+        });
+      }
+      if (document.getElementById('chart-dessert-attach')) {
+        createTrendChart('chart-dessert-attach', {
+          labels, showLegend:false, yAxisFormat:'percent',
+          datasets:[{label:'Dessert Rate', data:attWeeks.map(w=>attRates[w].dessertRate), color:'var(--brown)', style:'solid'}]
+        });
+      }
+      if (document.getElementById('chart-drink-attach')) {
+        createTrendChart('chart-drink-attach', {
+          labels, showLegend:false, yAxisFormat:'percent',
+          datasets:[{label:'Drink Rate', data:attWeeks.map(w=>attRates[w].drinkRate), color:'var(--chart-2025)', style:'dashed'}]
+        });
+      }
+    }
+
+    // Value menu cannibalization chart
+    if (hasWeekly && plateShareTrend.length > 0 && document.getElementById('chart-value-cannibalize')) {
+      createTrendChart('chart-value-cannibalize', {
+        labels: plateShareTrend.map(d => 'W'+d.fw),
+        showLegend: true,
+        yAxisFormat: 'percent',
+        yAxisLabel: 'Share of Total Units',
+        datasets: [
+          {label:'Plate Share', data:plateShareTrend.map(d=>d.share), color:'var(--gold)', style:'solid'},
+          {label:'Value Menu Share', data:valueShareTrend.map(d=>d.share), color:'var(--brown)', style:'dashed'}
+        ]
+      });
+    }
+  }, 0);
+}
+
+function renderTrajectory() {
+  const fw = S.week;
+  const agg = getAgg(fw);
+  const seasonality = S.computed.seasonality[fw];
+  const selPeriod = S.trajectoryPeriod || S.data.currentPeriod;
+
+  // ── Section 1: KPI Tiles ──
+  let html = `<div class="kpi-row">`;
+  html += kpiTile({label:'Brand Sales', value:fmt$(agg?.sales), wowChange:agg?.salesWoW, yoyChange:agg?.salesYoY, size:'large'});
+  html += kpiTile({label:'Brand Orders', value:(agg?.orders||0).toLocaleString(), wowChange:agg?.ordersWoW, yoyChange:agg?.ordersYoY});
+  if (seasonality) html += kpiTile({label:'Seasonal Index', value:seasonality.salesIndex.toFixed(2)+'x', subtitle:seasonality.narrative});
+  html += `</div>`;
+
+  // ── Section 2: Full Year Sales Chart ──
+  html += `<div class="card"><div class="card-title">Brand Sales — 2026 vs 2025</div>`;
+  html += `<div style="position:relative;height:280px"><canvas id="traj-sales-full"></canvas></div></div>`;
+
+  // ── Section 3: Full Year Orders Chart ──
+  html += `<div class="card"><div class="card-title">Brand Orders — 2026 vs 2025</div>`;
+  html += `<div style="position:relative;height:220px"><canvas id="traj-orders-full"></canvas></div></div>`;
+
+  // ── Section 4: Rolling Period Summary Table ──
+  html += `<div class="card"><div class="card-title">Period Performance Summary</div>`;
+  const periodSummaries = [];
+  S.data.availablePeriods.forEach(per => {
+    const pt = getPeriodTotals(per);
+    if (pt) periodSummaries.push(pt);
+  });
+  if (periodSummaries.length) {
+    html += `<div class="table-wrap"><table class="data-table" id="traj-period-summary"><thead><tr>`;
+    html += `<th>Period</th><th>Sales</th><th>vs PY</th><th>Orders</th><th>vs PY</th><th>Avg Check</th><th>Food Cost %</th><th>All-In Labor %</th><th>EBITDA %</th><th>Guest Score</th>`;
+    html += `</tr></thead><tbody>`;
+    periodSummaries.forEach((pt, idx) => {
+      const isCurrent = pt.period === S.data.currentPeriod;
+      const periodLabel = isCurrent ? pt.period + ' (PTD)' : pt.period;
+      const prev = idx > 0 ? periodSummaries[idx - 1] : null;
+      function trendArrow(curr, prevVal) {
+        if (curr == null || prevVal == null) return '';
+        if (curr > prevVal * 1.005) return ' <span style="color:var(--green);font-size:10px">▲</span>';
+        if (curr < prevVal * 0.995) return ' <span style="color:var(--red);font-size:10px">▼</span>';
+        return '';
+      }
+      html += `<tr>`;
+      html += `<td style="font-weight:600">${periodLabel}</td>`;
+      html += `<td>${fmt$(pt.sales)}${trendArrow(pt.sales, prev?.sales)}</td>`;
+      html += `<td><span style="color:${chgColor(pt.salesYoY)}">${fmtChg(pt.salesYoY)}</span></td>`;
+      html += `<td>${(pt.orders||0).toLocaleString()}${trendArrow(pt.orders, prev?.orders)}</td>`;
+      html += `<td><span style="color:${chgColor(pt.ordersYoY)}">${fmtChg(pt.ordersYoY)}</span></td>`;
+      html += `<td>${fmt$(pt.avgCheck)}${trendArrow(pt.avgCheck, prev?.avgCheck)}</td>`;
+      html += `<td>${pt.foodCostPct != null ? fmtPct(pt.foodCostPct) : '—'}${trendArrow(prev?.foodCostPct, pt.foodCostPct)}</td>`;
+      html += `<td>${pt.laborPct != null ? fmtPct(pt.laborPct) : '—'}${trendArrow(prev?.laborPct, pt.laborPct)}</td>`;
+      html += `<td>${pt.ebitdaPct != null ? fmtPct(pt.ebitdaPct) : '—'}${trendArrow(pt.ebitdaPct, prev?.ebitdaPct)}</td>`;
+      html += `<td>${pt.guestScore != null ? '<span style="color:' + guestScoreColor(pt.guestScore) + ';font-weight:700">' + pt.guestScore + '</span>' : '—'}${trendArrow(pt.guestScore, prev?.guestScore)}</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+
+  // ── Section 5: Period Deep Dive Comparison ──
+  html += `<div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">`;
+  html += `<span>Period Comparison — ${selPeriod} · 2026 vs 2025</span>`;
+  html += `<select class="period-sel" onchange="S.trajectoryPeriod=this.value;renderTrajectory()">`;
+  S.data.availablePeriods.forEach(p => {
+    html += `<option value="${p}" ${p === selPeriod ? 'selected' : ''}>${p}</option>`;
+  });
+  html += `</select></div>`;
+
+  const selPerNum = parseInt(selPeriod.replace('P', ''));
+  const selPerWeeks = S.data.availableWeeks.filter(w => S.data.weekToPeriod[w] === selPeriod);
+  const allStores = S.data.stores.map(s => s.name);
+  let cur26Sales = 0, cur26Orders = 0;
+  selPerWeeks.forEach(w => {
+    allStores.forEach(store => {
+      const st = S.computed.storeTotals[store]?.[w];
+      if (st) { cur26Sales += st.sales; cur26Orders += st.orders; }
+    });
+  });
+  const cur26Check = cur26Orders > 0 ? cur26Sales / cur26Orders : 0;
+  const pyRows = S.data.priorYear.filter(r => r.period === selPerNum && r.type === 'Destination');
+  const py25Sales = pyRows.reduce((s, r) => s + (r.sales || 0), 0);
+  const py25Orders = pyRows.reduce((s, r) => s + (r.orders || 0), 0);
+  const py25Check = py25Orders > 0 ? py25Sales / py25Orders : 0;
+
+  const compareMetrics = [
+    {label:'Sales', v26:cur26Sales, v25:py25Sales, fmt:'$'},
+    {label:'Orders', v26:cur26Orders, v25:py25Orders, fmt:'n'},
+    {label:'Avg Check', v26:cur26Check, v25:py25Check, fmt:'$'}
+  ];
+
+  html += `<table class="compare-table"><thead><tr><th>Metric</th><th>2026</th><th>2025</th><th>Change</th></tr></thead><tbody>`;
+  compareMetrics.forEach(m => {
+    const chg = m.v25 > 0 ? (m.v26 - m.v25) / m.v25 : null;
+    const v26Str = m.fmt === '$' ? fmt$(m.v26) : (m.v26 || 0).toLocaleString();
+    const v25Str = m.fmt === '$' ? fmt$(m.v25) : (m.v25 || 0).toLocaleString();
+    html += `<tr><td style="font-weight:600">${m.label}</td><td>${v26Str}</td><td>${v25Str}</td>`;
+    html += `<td><span style="color:${chgColor(chg)}">${fmtChg(chg)}</span></td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+
+  document.getElementById('content').innerHTML = html;
+
+  // ── Render Charts ──
+  setTimeout(() => {
+    // Build full 52-week x-axis
+    const allWeekNums = [];
+    for (let w = 1; w <= 52; w++) allWeekNums.push(w);
+    const xLabels = allWeekNums.map(w => {
+      const per = S.data.weekToPeriod[w];
+      // Show period label at period boundaries (w1 of each period)
+      if (per) {
+        const perWeeks = allWeekNums.filter(ww => S.data.weekToPeriod[ww] === per);
+        if (perWeeks.length && perWeeks[0] === w) return per;
+      }
+      return '';
+    });
+
+    const data2025Sales = allWeekNums.map(w => S.computed.brandHistory2025[w]?.sales || null);
+    const data2026Sales = allWeekNums.map(w => S.computed.brandTotals[w]?.sales || null);
+    const data2025Orders = allWeekNums.map(w => S.computed.brandHistory2025[w]?.orders || null);
+    const data2026Orders = allWeekNums.map(w => S.computed.brandTotals[w]?.orders || null);
+
+    // Sales chart
+    const salesDatasets = [
+      {label:'2025', data:data2025Sales, color:'var(--chart-2025)', style:'dashed'},
+      {label:'2026', data:data2026Sales, color:'var(--chart-2026)', style:'solid'}
+    ];
+    if (S.features.hasSeasonality) {
+      const bh25Dest = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.type === 'Destination');
+      const annualSales = bh25Dest.reduce((s, r) => s + r.sales, 0);
+      const weeklyAvg = annualSales / 52;
+      const seasonalData = allWeekNums.map(w => {
+        const si = S.data.seasonality.find(r => r.fw === w);
+        return si ? weeklyAvg * si.salesIndex : null;
+      });
+      salesDatasets.push({label:'Seasonal Expectation', data:seasonalData, color:'var(--chart-seasonal)', style:'dotted'});
+    }
+    createTrendChart('traj-sales-full', {
+      labels: xLabels, datasets: salesDatasets,
+      yAxisFormat:'currency', yAxisLabel:'Sales', showLegend:true
+    });
+
+    // Orders chart
+    createTrendChart('traj-orders-full', {
+      labels: xLabels,
+      datasets: [
+        {label:'2025', data:data2025Orders, color:'var(--chart-2025)', style:'dashed'},
+        {label:'2026', data:data2026Orders, color:'var(--chart-2026)', style:'solid'}
+      ],
+      yAxisFormat:'number', yAxisLabel:'Orders', showLegend:true
+    });
+  }, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTO-FETCH FROM ONEDRIVE
+   ═══════════════════════════════════════════════════════════════════ */
+const DATA_URL = 'https://rr-data-proxy.nathanlbreneman.workers.dev';
+
+function showManualUpload(errorMsg) {
+  document.getElementById('autoLoadMsg').style.display = 'none';
+  const manual = document.getElementById('manualUpload');
+  manual.style.display = 'block';
+  manual.style.cursor = 'pointer';
+  if (errorMsg) {
+    const p = document.createElement('p');
+    p.style.cssText = 'font-size:11px;color:var(--red);margin-top:8px';
+    p.textContent = errorMsg;
+    manual.appendChild(p);
+  }
+}
+
+async function autoFetchData() {
+  const loadBar = document.getElementById('loadBar');
+  const autoMsg = document.getElementById('autoLoadMsg');
+  autoMsg.style.display = 'block';
+  document.getElementById('manualUpload').style.display = 'none';
+  loadBar.style.width = '30%';
+
+  try {
+    const response = await fetch(DATA_URL);
+    loadBar.style.width = '60%';
+    if (!response.ok) throw new Error('Download failed: ' + response.status);
+    const buffer = await response.arrayBuffer();
+    loadBar.style.width = '90%';
+    const wb = XLSX.read(new Uint8Array(buffer), {type:'array', cellDates:true});
+    loadBar.style.width = '100%';
+    parseWorkbook(wb);
+  } catch(err) {
+    console.warn('Auto-fetch failed:', err.message);
+    showManualUpload('Auto-load unavailable — drag your file below or click to browse');
+  }
+}
+
+// Launch auto-fetch on page load
+autoFetchData();
+
+</script>
+</body>
+</html>
