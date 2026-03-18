@@ -700,7 +700,7 @@ function parseWorkbook(wb) {
 
   // Prior Year
   S.data.priorYear = sheet('Prior_Year_Fact_Table').map(r => ({
-    period: num(r.Fiscal_Period), fiscalYear: num(r.Fiscal_Year),
+    period: num(r.Fiscal_Period), fw: num(r.Fiscal_Week), fiscalYear: num(r.Fiscal_Year),
     store: trim(r.Store), type: trim(r.Analysis_Type), cat: trim(r.Category),
     sales: num(r.Sales), orders: num(r.Orders), avgCheck: num(r.Avg_Check)
   }));
@@ -841,18 +841,27 @@ function computeAll() {
         }
       }
 
-      // YoY (store-level: use prior year period-prorated)
+      // YoY (store-level: match same fiscal week in prior year)
       let salesYoY = null, ordersYoY = null, checkYoY = null;
-      const pyRows = S.data.priorYear.filter(r => r.store === store && r.period === curPeriodNum && r.type === 'Destination');
-      if (pyRows.length) {
-        const pySales = sumField(pyRows, 'sales');
-        const pyOrders = sumField(pyRows, 'orders');
-        const pyWeekAvgSales = pySales / totalPeriodWeeks;
-        const pyWeekAvgOrders = pyOrders / totalPeriodWeeks;
-        if (pyWeekAvgSales > 0) salesYoY = (sales - pyWeekAvgSales) / pyWeekAvgSales;
-        if (pyWeekAvgOrders > 0) ordersYoY = (orders - pyWeekAvgOrders) / pyWeekAvgOrders;
-        const pyCheck = pyOrders > 0 ? pySales / pyOrders : 0;
+      const pyWeekRow = S.data.priorYear.find(r => r.store === store && r.fw === fw && r.type === 'Destination');
+      if (pyWeekRow && pyWeekRow.sales > 0) {
+        salesYoY = (sales - pyWeekRow.sales) / pyWeekRow.sales;
+        if (pyWeekRow.orders > 0) ordersYoY = (orders - pyWeekRow.orders) / pyWeekRow.orders;
+        const pyCheck = pyWeekRow.orders > 0 ? pyWeekRow.sales / pyWeekRow.orders : 0;
         if (pyCheck > 0) checkYoY = (avgCheck - pyCheck) / pyCheck;
+      } else {
+        // Fallback: period-average if no weekly match (backward compatible)
+        const pyRows = S.data.priorYear.filter(r => r.store === store && r.period === curPeriodNum && r.type === 'Destination');
+        if (pyRows.length) {
+          const pySales = sumField(pyRows, 'sales');
+          const pyOrders = sumField(pyRows, 'orders');
+          const pyWeekAvgSales = pySales / pyRows.length;
+          const pyWeekAvgOrders = pyOrders / pyRows.length;
+          if (pyWeekAvgSales > 0) salesYoY = (sales - pyWeekAvgSales) / pyWeekAvgSales;
+          if (pyWeekAvgOrders > 0) ordersYoY = (orders - pyWeekAvgOrders) / pyWeekAvgOrders;
+          const pyCheck = pyOrders > 0 ? pySales / pyOrders : 0;
+          if (pyCheck > 0) checkYoY = (avgCheck - pyCheck) / pyCheck;
+        }
       }
 
       // Signal
@@ -1078,10 +1087,14 @@ function computeAll() {
     const weeksRemaining = totalPeriodWeeks - weeksElapsed;
     const weeklyRunRateNeeded = weeksRemaining > 0 ? (periodBudget - ptdSales) / weeksRemaining : 0;
     const onPace = ptdSales >= (periodBudget / totalPeriodWeeks * weeksElapsed);
-    // Prior year PTD
-    const pyRows = S.data.priorYear.filter(r => r.store===store && r.period===curPeriodNum && r.type==='Destination');
-    const pyTotal = sumField(pyRows, 'sales');
-    const priorYearPTD = pyTotal * (weeksElapsed / totalPeriodWeeks);
+    // Prior year PTD - sum actual weekly data for elapsed weeks
+    const pyPTDRows = periodWeeks.map(w => S.data.priorYear.find(r => r.store===store && r.fw===w && r.type==='Destination')).filter(Boolean);
+    const priorYearPTD = pyPTDRows.length ? pyPTDRows.reduce((s,r) => s + (r.sales||0), 0) : (() => {
+      // Fallback: period-level proration if no weekly data
+      const pyRows = S.data.priorYear.filter(r => r.store===store && r.period===curPeriodNum && r.type==='Destination');
+      const pyTotal = sumField(pyRows, 'sales');
+      return pyTotal * (weeksElapsed / totalPeriodWeeks);
+    })();
     C.budgetPacing[store] = {period:curPeriod, ptdSales, periodBudget, variance, variancePct, weeksElapsed, weeksRemaining, weeklyRunRateNeeded, onPace, priorYearPTD};
   });
 
