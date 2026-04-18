@@ -299,19 +299,18 @@ const CONFIG = {
   },
   itemClassifier: {
     ENTREE_PLATE:['meat plate','r&r plate','founders platter','uvu meat'],
-    ENTREE_SANDWICH:['pulled pork sandwich','pineapple pork sand','caveman burger','cheese burger','chicken sandwich','turkey sandwich','chopped brisket sand','sliced brisket sand','r&r sandwich bar'],
-    ENTREE_VALUE:['buddy bowl','taco trio','bbq burrito','brisket tacos','bbq pork tacos','bbq chicken tacos','rib tip'],
-    ENTREE_OTHER:['half rack','smoked wings','wing special','nachos','cobb salad','brisket salad','chicken salad','pulled pork salad','bbq salad','pork mac','brisket nacho','chicken nacho','pork nacho','bbq box'],
-    SIDE:['mac and cheese','mac & cheese','bbq beans','french fries','sweet potato fries','coleslaw','creamed corn','potato salad','garlic masher','mashed potato','hush pup','fried pickle','garden salad','side salad','cornbread','dinner roll','dozen roll','onion ring','jalapen','chips & queso','original bbq sauce'],
-    LOADED_SIDE:['baked potato'],
+    ENTREE_SANDWICH:['pulled pork sandwich','pineapple pork sand','caveman burger','cheese burger','chicken sandwich','turkey sandwich','chopped brisket sand','sliced brisket sand','r&r sandwich bar','uvu bbq sandwich','vending pork sandwich','vending brisket sandwich','vending chicken sandwich'],
+    ENTREE_VALUE:['buddy bowl','taco trio','bbq burrito','brisket tacos','bbq pork tacos','bbq chicken tacos','rib tip','taco + chips'],
+    ENTREE_OTHER:['half rack','smoked wings','wing special','nachos','cobb salad','brisket salad','chicken salad','pulled pork salad','bbq salad','pork mac','brisket nacho','chicken nacho','pork nacho','bbq box','loaded mac','uvu loaded mac','baked potato','vending brisket mac','vending chicken mac','vending brisket plate','vending pork plate','vending chicken plate'],
+    SIDE:['mac and cheese','mac & cheese','bbq beans','french fries','sweet potato fries','coleslaw','creamed corn','potato salad','garlic masher','mashed potato','hush pup','fried pickle','garden salad','side salad','cornbread','dinner roll','dozen roll','onion ring','jalapen','chips & queso','original bbq sauce','sweet bbq sauce','spicy bbq sauce','carolina sauce','fries (nacho)'],
     DESSERT:['cobbler','peach cobbler','pudding','banana pudding','cookie','brownie'],
     DRINK:['soda',' tea','lemonade','water','coke','sprite','dr pepper','root beer','fanta','mello','pepsi','coffee','juice','drink'],
     KIDS:['kids '],
-    BY_THE_POUND:['1#','1/2#','1 lb','per pound','by the pound'],
+    BY_THE_POUND:['1#','1/2#','1/4#','1 lb','per pound','by the pound','rib bone'],
     FAMILY_PACK:['family meal','wings pack','smoked wings pack'],
-    MODIFIER:['brisket - sliced','brisket - chopped','c-2 meat brisket','pulled pork -','turkey -','sausage -','chicken -','pork loin -','boneless chicken -','ribs -'],
-    CATERING_ITEM:['c- r&r','c- dozen','c- mac','e-half','e-pork','fmp'],
-    NON_FOOD:['gift card','doordash driver tip','doordash delivery fee','delivery fee','discount','merch','void','comp ']
+    MODIFIER:['brisket - sliced','brisket - chopped','c-2 meat brisket','pulled pork -','turkey -','sausage -','chicken -','pork loin -','boneless chicken -','ribs -','brisket-'],
+    CATERING_ITEM:['c- r&r','c- dozen','c- mac','c- green salad','c- loaded potato','c- misc','e-half','e-pork','fmp'],
+    NON_FOOD:['gift card','doordash driver tip','doordash delivery fee','delivery fee','discount','merch','void','comp ','service charge','founders service']
   },
   signalPatterns: {
     BALANCED_GROWTH: {salesUp:true, ordersUp:true, label:'Balanced Growth', color:'var(--green)'},
@@ -319,7 +318,8 @@ const CONFIG = {
     CHECK_EROSION:   {salesUp:false, ordersUp:true, label:'Check Erosion', color:'var(--blue)'},
     DECLINE:         {salesUp:false, ordersUp:false, label:'Decline', color:'var(--red)'}
   },
-  defaultPayrollTaxRate: 0.125
+  defaultPayrollTaxRate: 0.125,
+  otherControllablePct: 0.236
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -597,8 +597,8 @@ function handleFile(file) {
 }
 
 function parseWorkbook(wb) {
-  const requiredTabs = ['Weekly_Fact_Table','Budget_Fact_Table','Brand_Weekly_History','Prior_Year_Fact_Table','Store_List','Fiscal_Calendar'];
-  const optionalTabs = ['Seasonality_Index','Channel_Seasonality_Index','Brink_Pmix_Import_2026','Brink_Pmix_Import_2025','Brink_Pmix_Weekly_2026','Brink_Pmix_Weekly_2025','Store_Salary'];
+  const requiredTabs = ['Weekly_Fact_Table','Budget_Fact_Table','Brand_Weekly_History','Store_List','Fiscal_Calendar'];
+  const optionalTabs = ['Prior_Year_Fact_Table','PY_Destination_Weekly','Seasonality_Index','Channel_Seasonality_Index','Brink_Pmix_Import_2026','Brink_Pmix_Import_2025','Brink_Pmix_Weekly_2026','Brink_Pmix_Weekly_2025','Store_Salary'];
   const found = wb.SheetNames;
   const missing = requiredTabs.filter(t => !found.includes(t));
   if (missing.length) { document.getElementById('content').innerHTML = `<div class="card" style="color:var(--red)">Missing required tabs: ${missing.join(', ')}</div>`; return; }
@@ -698,12 +698,14 @@ function parseWorkbook(wb) {
     }));
   }
 
-  // Prior Year
-  S.data.priorYear = sheet('Prior_Year_Fact_Table').map(r => ({
+  // Prior Year — prefer PY_Destination_Weekly (channel-level weekly), fall back to Prior_Year_Fact_Table
+  const pyTabName = found.includes('PY_Destination_Weekly') ? 'PY_Destination_Weekly' : 'Prior_Year_Fact_Table';
+  S.data.priorYear = sheet(pyTabName).map(r => ({
     period: num(r.Fiscal_Period), fw: num(r.Fiscal_Week), fiscalYear: num(r.Fiscal_Year),
     store: trim(r.Store), type: trim(r.Analysis_Type), cat: trim(r.Category),
     sales: num(r.Sales), orders: num(r.Orders), avgCheck: num(r.Avg_Check)
   }));
+  S.features.hasPYWeekly = S.data.priorYear.some(r => r.fw > 0);
 
   // Store_List
   S.data.stores = sheet('Store_List').map(r => ({
@@ -765,7 +767,7 @@ function parseWorkbook(wb) {
 }
 
 function showValidation(found) {
-  const allTabs = ['Weekly_Fact_Table','Budget_Fact_Table','Brand_Weekly_History','Prior_Year_Fact_Table','Store_List','Fiscal_Calendar','Seasonality_Index','Channel_Seasonality_Index','Brink_Pmix_Import_2026','Brink_Pmix_Import_2025','Brink_Pmix_Weekly_2026','Brink_Pmix_Weekly_2025','Store_Salary'];
+  const allTabs = ['Weekly_Fact_Table','Budget_Fact_Table','Brand_Weekly_History','Prior_Year_Fact_Table','PY_Destination_Weekly','Store_List','Fiscal_Calendar','Seasonality_Index','Channel_Seasonality_Index','Brink_Pmix_Import_2026','Brink_Pmix_Import_2025','Brink_Pmix_Weekly_2026','Brink_Pmix_Weekly_2025','Store_Salary'];
   const storeNames = [...new Set(S.data.weekly.map(r=>r.store))];
   const weeks = S.data.availableWeeks;
   let html = '<div class="validation-summary">';
@@ -841,22 +843,25 @@ function computeAll() {
         }
       }
 
-      // YoY (store-level: match same fiscal week in prior year)
+      // YoY (store-level: match same fiscal week, sum all destination channels)
       let salesYoY = null, ordersYoY = null, checkYoY = null;
-      const pyWeekRow = S.data.priorYear.find(r => r.store === store && r.fw === fw && r.type === 'Destination');
-      if (pyWeekRow && pyWeekRow.sales > 0) {
-        salesYoY = (sales - pyWeekRow.sales) / pyWeekRow.sales;
-        if (pyWeekRow.orders > 0) ordersYoY = (orders - pyWeekRow.orders) / pyWeekRow.orders;
-        const pyCheck = pyWeekRow.orders > 0 ? pyWeekRow.sales / pyWeekRow.orders : 0;
+      const pyWeekRows = S.data.priorYear.filter(r => r.store === store && r.fw === fw && r.type === 'Destination');
+      if (pyWeekRows.length) {
+        const pySales = sumField(pyWeekRows, 'sales');
+        const pyOrders = sumField(pyWeekRows, 'orders');
+        if (pySales > 0) salesYoY = (sales - pySales) / pySales;
+        if (pyOrders > 0) ordersYoY = (orders - pyOrders) / pyOrders;
+        const pyCheck = pyOrders > 0 ? pySales / pyOrders : 0;
         if (pyCheck > 0) checkYoY = (avgCheck - pyCheck) / pyCheck;
       } else {
-        // Fallback: period-average if no weekly match (backward compatible)
+        // Fallback: period-average if no weekly match
         const pyRows = S.data.priorYear.filter(r => r.store === store && r.period === curPeriodNum && r.type === 'Destination');
         if (pyRows.length) {
           const pySales = sumField(pyRows, 'sales');
           const pyOrders = sumField(pyRows, 'orders');
-          const pyWeekAvgSales = pySales / pyRows.length;
-          const pyWeekAvgOrders = pyOrders / pyRows.length;
+          const weekCount = [...new Set(pyRows.map(r => r.fw).filter(w => w > 0))].length || totalPeriodWeeks;
+          const pyWeekAvgSales = pySales / weekCount;
+          const pyWeekAvgOrders = pyOrders / weekCount;
           if (pyWeekAvgSales > 0) salesYoY = (sales - pyWeekAvgSales) / pyWeekAvgSales;
           if (pyWeekAvgOrders > 0) ordersYoY = (orders - pyWeekAvgOrders) / pyWeekAvgOrders;
           const pyCheck = pyOrders > 0 ? pySales / pyOrders : 0;
@@ -1087,14 +1092,15 @@ function computeAll() {
     const weeksRemaining = totalPeriodWeeks - weeksElapsed;
     const weeklyRunRateNeeded = weeksRemaining > 0 ? (periodBudget - ptdSales) / weeksRemaining : 0;
     const onPace = ptdSales >= (periodBudget / totalPeriodWeeks * weeksElapsed);
-    // Prior year PTD - sum actual weekly data for elapsed weeks
-    const pyPTDRows = periodWeeks.map(w => S.data.priorYear.find(r => r.store===store && r.fw===w && r.type==='Destination')).filter(Boolean);
-    const priorYearPTD = pyPTDRows.length ? pyPTDRows.reduce((s,r) => s + (r.sales||0), 0) : (() => {
-      // Fallback: period-level proration if no weekly data
+    // Prior year PTD — sum actual weekly destination data for elapsed weeks
+    let priorYearPTD = 0;
+    const pyPTDWeekRows = periodWeeks.flatMap(w => S.data.priorYear.filter(r => r.store===store && r.fw===w && r.type==='Destination'));
+    if (pyPTDWeekRows.length) {
+      priorYearPTD = pyPTDWeekRows.reduce((s,r) => s + (r.sales||0), 0);
+    } else {
       const pyRows = S.data.priorYear.filter(r => r.store===store && r.period===curPeriodNum && r.type==='Destination');
-      const pyTotal = sumField(pyRows, 'sales');
-      return pyTotal * (weeksElapsed / totalPeriodWeeks);
-    })();
+      priorYearPTD = sumField(pyRows, 'sales') * (weeksElapsed / totalPeriodWeeks);
+    }
     C.budgetPacing[store] = {period:curPeriod, ptdSales, periodBudget, variance, variancePct, weeksElapsed, weeksRemaining, weeklyRunRateNeeded, onPace, priorYearPTD};
   });
 
@@ -1162,8 +1168,8 @@ function computeAll() {
         const overBudget = cost.foodCostPct - cost.budgetFoodCostPct;
         foodPts = overBudget <= 0 ? 10 : Math.max(0, 10 - overBudget * 100 * 3);
       }
-      if (cost?.laborCostPct != null && cost.budgetAllInLaborPct != null) {
-        const overBudget = cost.laborCostPct - cost.budgetAllInLaborPct;
+      if (cost?.laborCostPct != null && cost.budgetLaborPct != null) {
+        const overBudget = cost.laborCostPct - cost.budgetLaborPct;
         laborPts = overBudget <= 0 ? 10 : Math.max(0, 10 - overBudget * 100 * 3);
       }
       const costDiscipline = Math.min(20, foodPts + laborPts);
@@ -1352,15 +1358,19 @@ function computeAll() {
       if (!salaryRow) salaryRow = S.data.salary.find(r => r.store===store && r.periodSalary!=null);
       const periodSalary = salaryRow?.periodSalary || 0;
       const taxRate = salaryRow?.payrollTax ?? CONFIG.defaultPayrollTaxRate;
-      totalSalaryCost += periodSalary;
-      totalPayrollTax += (hourlyLabor + periodSalary) * taxRate;
+      const proratedSalary = periodSalary * (perWeeks.length / CONFIG.weeksPerPeriod);
+      totalSalaryCost += proratedSalary;
+      totalPayrollTax += (hourlyLabor + proratedSalary) * taxRate;
     });
     const allInLabor = laborCostDollars + totalSalaryCost + totalPayrollTax;
     const budgetRows = S.data.budget.filter(b => b.period===perNum);
     const budgetRevenue = budgetRows.reduce((s,b)=>s+b.budgetSales,0);
     const budgetEbitdaPct = budgetRows.length ? budgetRows.reduce((s,b)=>s+b.budgetEbitdaPct,0)/budgetRows.length : 0;
+    const other = revenue * CONFIG.otherControllablePct;
+    const estEbitda = revenue - foodCostDollars - allInLabor - other;
+    const estEbitdaPct = revenue > 0 ? estEbitda / revenue : 0;
     C.ebitda[per] = {revenue, foodCost:foodCostDollars, laborCostHourly:laborCostDollars, salaryCost:totalSalaryCost, payrollTax:totalPayrollTax, allInLabor,
-      ebitda:0, ebitdaPct:0, budgetEbitdaPct, budgetRevenue};
+      ebitda:estEbitda, ebitdaPct:estEbitdaPct, budgetEbitdaPct, budgetRevenue};
   });
 }
 
@@ -1670,9 +1680,13 @@ function renderTraffic() {
   const cat = ch?.destination?.['Catering'];
   let html = `<div class="kpi-row">`;
   html += kpiTile({label:'Total Orders', value:(agg?.orders||0).toLocaleString(), wowChange:agg?.ordersWoW, yoyChange:agg?.ordersYoY});
-  // Compute Dine-in YoY from brand history
-  const dineinBh25 = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination' && r.cat === 'Dine-in');
-  const dineinPyOrders = dineinBh25.reduce((s,r) => s + (r.orders||0), 0);
+  // Compute Dine-in YoY — prefer PY_Destination_Weekly
+  let dineinPyOrders = 0;
+  if (S.features.hasPYWeekly) {
+    dineinPyOrders = S.data.priorYear.filter(r => r.fw === fw && r.type === 'Destination' && r.cat === 'Dine-in').reduce((s,r) => s + (r.orders||0), 0);
+  } else {
+    dineinPyOrders = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination' && r.cat === 'Dine-in').reduce((s,r) => s + (r.orders||0), 0);
+  }
   const dineinYoY = dineinPyOrders > 0 && dinein ? (dinein.orders - dineinPyOrders) / dineinPyOrders : null;
   html += kpiTile({label:'Dine-in Orders', value:(dinein?.orders||0).toLocaleString(), wowChange:dinein?.ordersWoW, yoyChange:dineinYoY});
   html += kpiTile({label:'Marketplace Orders', value:(mkt?.orders||0).toLocaleString(), wowChange:mkt?.ordersWoW});
@@ -1680,13 +1694,21 @@ function renderTraffic() {
   html += `</div>`;
 
   // ── Section 2: Destination Channels Table ──
-  // Build YoY from brandHistory
+  // Build YoY — prefer PY_Destination_Weekly (summed across stores), fall back to Brand_Weekly_History
+  const trafficStores = getStores();
   const destChannels = CONFIG.destinationChannels.map(c => {
     const d = ch?.destination?.[c] || {};
     if (!d.orders && !d.sales) return null;
-    // YoY from Brand_Weekly_History
-    const bh25 = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination' && r.cat === c);
-    const pyOrders = bh25.reduce((s,r) => s + (r.orders||0), 0);
+    let pyOrders = 0, pySales = 0;
+    if (S.features.hasPYWeekly) {
+      const pyRows = S.data.priorYear.filter(r => r.fw === fw && r.type === 'Destination' && r.cat === c && trafficStores.includes(r.store));
+      pyOrders = pyRows.reduce((s,r) => s + (r.orders||0), 0);
+      pySales = pyRows.reduce((s,r) => s + (r.sales||0), 0);
+    } else {
+      const bh25 = S.data.brandHistory.filter(r => r.fiscalYear === 2025 && r.fw === fw && r.type === 'Destination' && r.cat === c);
+      pyOrders = bh25.reduce((s,r) => s + (r.orders||0), 0);
+      pySales = bh25.reduce((s,r) => s + (r.sales||0), 0);
+    }
     const yoyOrders = pyOrders > 0 ? (d.orders - pyOrders) / pyOrders : null;
     return {channel:c, sales:d.sales||0, orders:d.orders||0, shareOfOrders:d.shareOfOrders||0, avgCheck:d.avgCheck||0, salesWoW:d.salesWoW, ordersWoW:d.ordersWoW, yoyOrders};
   }).filter(Boolean);
@@ -1934,23 +1956,36 @@ function renderScorecard() {
     // ── B4: Channel Decomposition ──
     if (st.salesWoW != null && sc) {
       html += `<div class="card"><div class="card-title">What's Driving the Change</div>`;
-      // Destinations
+      // Destinations with YoY from PY_Destination_Weekly
+      const pyDestWeek = S.data.priorYear.filter(r => r.store === store && r.fw === fw && r.type === 'Destination');
       const destChannels = CONFIG.destinationChannels.map(ch => {
         const d = sc.destination?.[ch] || {};
         const priorSales = S.computed.storeChannels[store]?.[fw-1]?.destination?.[ch]?.sales || 0;
         const dollarChange = (d.sales||0) - priorSales;
-        return {channel:ch, sales:d.sales||0, dollarChange, salesWoW:d.salesWoW, contrib:d.contributionToStoreChange||0};
+        const pyRow = pyDestWeek.find(r => r.cat === ch);
+        const pySales = pyRow?.sales || 0;
+        const pyOrders = pyRow?.orders || 0;
+        const salesYoY = pySales > 0 ? ((d.sales||0) - pySales) / pySales : null;
+        const ordersYoY = pyOrders > 0 ? ((d.orders||0) - pyOrders) / pyOrders : null;
+        return {channel:ch, sales:d.sales||0, orders:d.orders||0, dollarChange, salesWoW:d.salesWoW, contrib:d.contributionToStoreChange||0, pySales, salesYoY, ordersYoY};
       }).filter(r => r.sales > 0 || Math.abs(r.dollarChange) > 0).sort((a,b) => Math.abs(b.contrib) - Math.abs(a.contrib));
 
       if (destChannels.length) {
+        const hasPY = pyDestWeek.length > 0;
         html += `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Destinations</div>`;
-        html += `<div class="table-wrap"><table class="data-table"><thead><tr><th>Channel</th><th>This Week Sales</th><th>WoW Change</th><th>Contribution</th></tr></thead><tbody>`;
+        html += `<div class="table-wrap"><table class="data-table"><thead><tr><th>Channel</th><th>This Week</th><th>WoW</th><th>Contribution</th>${hasPY ? '<th>2025</th><th>YoY Sales</th><th>YoY Orders</th>' : ''}</tr></thead><tbody>`;
         const topContrib = destChannels[0];
         destChannels.forEach(r => {
           const isBold = r.channel === topContrib.channel ? 'font-weight:700' : '';
           html += `<tr><td style="${isBold}">${r.channel}</td><td>${fmt$(r.sales)}</td>`;
           html += `<td><span style="color:${chgColor(r.salesWoW)}">${fmt$(r.dollarChange)} (${fmtChg(r.salesWoW)})</span></td>`;
-          html += `<td style="${isBold};color:${chgColor(r.contrib)}">${fmtPct(Math.abs(r.contrib))}</td></tr>`;
+          html += `<td style="${isBold};color:${chgColor(r.contrib)}">${fmtPct(Math.abs(r.contrib))}</td>`;
+          if (hasPY) {
+            html += `<td style="color:var(--muted)">${r.pySales > 0 ? fmt$(r.pySales) : '—'}</td>`;
+            html += `<td><span style="color:${chgColor(r.salesYoY)}">${r.salesYoY != null ? fmtChg(r.salesYoY) : '—'}</span></td>`;
+            html += `<td><span style="color:${chgColor(r.ordersYoY)}">${r.ordersYoY != null ? fmtChg(r.ordersYoY) : '—'}</span></td>`;
+          }
+          html += `</tr>`;
         });
         html += `</tbody></table></div>`;
         if (topContrib) {
@@ -1958,18 +1993,30 @@ function renderScorecard() {
         }
       }
 
-      // Dayparts
+      // Dayparts with YoY from PY_Destination_Weekly
+      const pyDaypartWeek = S.data.priorYear.filter(r => r.store === store && r.fw === fw && r.type === 'Daypart');
       const daypartData = CONFIG.allDayparts.map(dp => {
         const d = sc.daypart?.[dp] || {};
         const storeOrders = st.orders || 1;
-        return {daypart: CONFIG.daypartLabels[dp] || dp, sales:d.sales||0, orders:d.orders||0, shareOfOrders: storeOrders > 0 ? (d.orders||0)/storeOrders : 0};
+        const pyRow = pyDaypartWeek.find(r => r.cat === dp);
+        const pyOrders = pyRow?.orders || 0;
+        const pySales = pyRow?.sales || 0;
+        const ordersYoY = pyOrders > 0 ? ((d.orders||0) - pyOrders) / pyOrders : null;
+        const salesYoY = pySales > 0 ? ((d.sales||0) - pySales) / pySales : null;
+        return {daypart: CONFIG.daypartLabels[dp] || dp, sales:d.sales||0, orders:d.orders||0, shareOfOrders: storeOrders > 0 ? (d.orders||0)/storeOrders : 0, pyOrders, pySales, ordersYoY, salesYoY};
       }).filter(r => r.orders > 0).sort((a,b) => b.sales - a.sales);
 
       if (daypartData.length) {
+        const hasPYDp = pyDaypartWeek.length > 0;
         html += `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">Dayparts</div>`;
-        html += `<div class="table-wrap"><table class="data-table"><thead><tr><th>Daypart</th><th>This Week Sales</th><th>Orders</th><th>Share of Orders</th></tr></thead><tbody>`;
+        html += `<div class="table-wrap"><table class="data-table"><thead><tr><th>Daypart</th><th>This Week Sales</th><th>Orders</th><th>Share</th>${hasPYDp ? '<th>2025 Orders</th><th>YoY Orders</th>' : ''}</tr></thead><tbody>`;
         daypartData.forEach(r => {
-          html += `<tr><td>${r.daypart}</td><td>${fmt$(r.sales)}</td><td>${r.orders.toLocaleString()}</td><td>${fmtPct(r.shareOfOrders)}</td></tr>`;
+          html += `<tr><td>${r.daypart}</td><td>${fmt$(r.sales)}</td><td>${r.orders.toLocaleString()}</td><td>${fmtPct(r.shareOfOrders)}</td>`;
+          if (hasPYDp) {
+            html += `<td style="color:var(--muted)">${r.pyOrders > 0 ? r.pyOrders.toLocaleString() : '—'}</td>`;
+            html += `<td><span style="color:${chgColor(r.ordersYoY)}">${r.ordersYoY != null ? fmtChg(r.ordersYoY) : '—'}</span></td>`;
+          }
+          html += `</tr>`;
         });
         html += `</tbody></table></div>`;
       }
@@ -1991,17 +2038,17 @@ function renderScorecard() {
     }
     html += kpiTile({label:'Food Cost %', value:fmtPct(foodActual), subtitle:foodSub});
 
-    // Labor Cost
+    // Hourly Labor Cost
     const laborActual = cost?.laborCostPct;
-    const laborBudget = cost?.budgetAllInLaborPct;
-    const laborVarD = cost?.laborCostVarianceDollars;
+    const laborBudget = cost?.budgetLaborPct;
+    const laborVarD = (laborActual != null && laborBudget != null) ? (laborActual - laborBudget) * (S.computed.storeTotals[store]?.[fw]?.sales || 0) : null;
     let laborSub = '';
     if (laborBudget != null) laborSub += `Budget: ${fmtPct(laborBudget)}`;
     if (laborVarD != null) {
       const over = laborVarD > 0;
       laborSub += `<br><span style="color:${over?'var(--red)':'var(--green)'}">${over?'+':''}${fmt$(laborVarD)} ${over?'over':'under'} budget</span>`;
     }
-    html += kpiTile({label:'Labor Cost %', value:fmtPct(laborActual), subtitle:laborSub});
+    html += kpiTile({label:'Hourly Labor %', value:fmtPct(laborActual), subtitle:laborSub});
 
     // SPLH
     const brandSales = S.computed.brandTotals[fw]?.sales || 0;
@@ -2200,7 +2247,7 @@ function renderFinancials() {
   html += `<div class="chart-row">`;
   html += `<div class="card"><div class="card-title">Food Cost % Trend — Last 6 Weeks</div>`;
   html += `<div style="position:relative;height:200px"><canvas id="fin-food-trend"></canvas></div></div>`;
-  html += `<div class="card"><div class="card-title">Labor Cost % Trend — Last 6 Weeks</div>`;
+  html += `<div class="card"><div class="card-title">Hourly Labor % Trend — Last 6 Weeks</div>`;
   html += `<div style="position:relative;height:200px"><canvas id="fin-labor-trend"></canvas></div></div>`;
   html += `</div>`;
 
@@ -2229,7 +2276,7 @@ function renderFinancials() {
         const st = S.computed.storeTotals[store]?.[w];
         return s + (c?.laborCostPct != null && st ? c.laborCostPct * st.sales : 0);
       }, 0);
-      const blp = budgetRow.budgetAllInLaborPct || budgetRow.budgetLaborPct;
+      const blp = budgetRow.budgetLaborPct;
       const laborAllowedTotal = budgetRow.budgetSales * blp;
       const laborRemainingAllowed = laborAllowedTotal - ptdLaborDollars;
       const canRunLabor = remainingBudgetRev > 0 ? laborRemainingAllowed / remainingBudgetRev : null;
@@ -2263,22 +2310,18 @@ function renderFinancials() {
   html += `<div class="card"><div class="card-title">Four-Wall EBITDA Waterfall — ${per} PTD</div>`;
   html += `<div style="position:relative;height:280px"><canvas id="fin-waterfall"></canvas></div>`;
   if (ebitda && ebitda.revenue > 0) {
+    const revenue = ebitda.revenue;
     const fc = ebitda.foodCost;
     const labor = ebitda.allInLabor;
-    const remainder = ebitda.revenue - fc - labor;
-    const estEbitdaPct = ebitda.budgetEbitdaPct || 0;
-    const estEbitda = estEbitdaPct > 0 ? ebitda.revenue * estEbitdaPct : null;
-    const estOther = estEbitda != null ? remainder - estEbitda : null;
+    const other = revenue * CONFIG.otherControllablePct;
+    const wfEbitda = revenue - fc - labor - other;
+    const wfEbitdaPct = revenue > 0 ? wfEbitda / revenue : 0;
     html += `<div class="waterfall-summary">`;
-    html += `<span>Revenue: ${fmt$(ebitda.revenue)}</span>`;
-    html += `<span>Food: ${fmt$(fc)} (${fmtPct(fc / ebitda.revenue)})</span>`;
-    html += `<span>Labor: ${fmt$(labor)} (${fmtPct(labor / ebitda.revenue)})</span>`;
-    if (estOther != null) {
-      html += `<span>Other (est): ${fmt$(estOther)} (${fmtPct(estOther / ebitda.revenue)})</span>`;
-      html += `<span>EBITDA (est): ${fmt$(estEbitda)} (${fmtPct(estEbitdaPct)})</span>`;
-    } else {
-      html += `<span>Remainder: ${fmt$(remainder)} (${fmtPct(remainder / ebitda.revenue)})</span>`;
-    }
+    html += `<span>Revenue: ${fmt$(revenue)}</span>`;
+    html += `<span>Food: ${fmt$(fc)} (${fmtPct(fc / revenue)})</span>`;
+    html += `<span>Labor (All-In): ${fmt$(labor)} (${fmtPct(labor / revenue)})</span>`;
+    html += `<span>Other (${fmtPct(CONFIG.otherControllablePct)}): ${fmt$(other)}</span>`;
+    html += `<span>EBITDA: ${fmt$(wfEbitda)} (${fmtPct(wfEbitdaPct)})</span>`;
     html += `<span style="color:var(--muted)">Budget EBITDA: ${fmtPct(ebitda.budgetEbitdaPct)}</span>`;
     html += `</div>`;
   }
@@ -2304,17 +2347,17 @@ function renderFinancials() {
     if (budgetFcAvg != null) fcDatasets.push({label:'Budget', data:recentWeeks.map(() => budgetFcAvg), color:'var(--chart-budget)', style:'dashed'});
     createTrendChart('fin-food-trend', {labels:wLabels, datasets:fcDatasets, yAxisFormat:'percent', showLegend:true});
 
-    // Labor cost trend
+    // Hourly labor cost trend
     const lcData = recentWeeks.map(w => getSalesWeightedCost(allStores, w, 'laborCostPct'));
     const budgetLcAvg = (() => {
-      const bRows = S.data.budget.filter(b => b.period === perNum && (b.budgetAllInLaborPct > 0 || b.budgetLaborPct > 0));
+      const bRows = S.data.budget.filter(b => b.period === perNum && b.budgetLaborPct > 0);
       if (!bRows.length) return null;
       let totalBudgetDollars = 0, totalBudgetSales = 0;
-      bRows.forEach(b => { const blp = b.budgetAllInLaborPct || b.budgetLaborPct; totalBudgetDollars += blp * b.budgetSales; totalBudgetSales += b.budgetSales; });
+      bRows.forEach(b => { totalBudgetDollars += b.budgetLaborPct * b.budgetSales; totalBudgetSales += b.budgetSales; });
       return totalBudgetSales > 0 ? totalBudgetDollars / totalBudgetSales : null;
     })();
-    const lcDatasets = [{label:'Labor Cost %', data:lcData, color:'var(--chart-2026)', style:'solid'}];
-    if (budgetLcAvg != null) lcDatasets.push({label:'Budget', data:recentWeeks.map(() => budgetLcAvg), color:'var(--chart-budget)', style:'dashed'});
+    const lcDatasets = [{label:'Hourly Labor %', data:lcData, color:'var(--chart-2026)', style:'solid'}];
+    if (budgetLcAvg != null) lcDatasets.push({label:'Budget (Hourly)', data:recentWeeks.map(() => budgetLcAvg), color:'var(--chart-budget)', style:'dashed'});
     createTrendChart('fin-labor-trend', {labels:wLabels, datasets:lcDatasets, yAxisFormat:'percent', showLegend:true});
 
     // EBITDA Waterfall
@@ -2322,25 +2365,12 @@ function renderFinancials() {
       const revenue = ebitda.revenue;
       const food = ebitda.foodCost;
       const labor = ebitda.allInLabor;
-      // Estimate EBITDA using budget EBITDA % (since Other Controllable not in data)
-      const estEbitdaPct = ebitda.budgetEbitdaPct || 0;
-      const remainder = revenue - food - labor;
-      // If we have a budget EBITDA %, use it to estimate Other; otherwise show 3-bar
-      const hasBudgetEbitda = estEbitdaPct > 0;
-      let waterfallLabels, waterfallSpacers, waterfallValues, waterfallColors;
-      if (hasBudgetEbitda) {
-        const estEbitda = revenue * estEbitdaPct;
-        const estOther = remainder - estEbitda;
-        waterfallLabels = ['Revenue', 'Food Cost', 'All-In Labor', 'Other (est)', 'EBITDA (est)'];
-        waterfallSpacers = [0, revenue - food, revenue - food - labor, revenue - food - labor - Math.max(0, estOther), 0];
-        waterfallValues = [revenue, food, labor, Math.max(0, estOther), Math.max(0, estEbitda)];
-        waterfallColors = [resolveColor('var(--gold)'), resolveColor('var(--red)'), resolveColor('var(--red)'), resolveColor('var(--yellow)'), resolveColor('var(--green)')];
-      } else {
-        waterfallLabels = ['Revenue', 'Food Cost', 'All-In Labor', 'Remainder'];
-        waterfallSpacers = [0, revenue - food, revenue - food - labor, 0];
-        waterfallValues = [revenue, food, labor, remainder];
-        waterfallColors = [resolveColor('var(--gold)'), resolveColor('var(--red)'), resolveColor('var(--red)'), resolveColor('var(--green)')];
-      }
+      const other = revenue * CONFIG.otherControllablePct;
+      const wfEbitda = Math.max(0, revenue - food - labor - other);
+      const waterfallLabels = ['Revenue', 'Food Cost', 'All-In Labor', `Other (${fmtPct(CONFIG.otherControllablePct)})`, 'EBITDA'];
+      const waterfallSpacers = [0, revenue - food, revenue - food - labor, revenue - food - labor - other, 0];
+      const waterfallValues = [revenue, food, labor, other, wfEbitda];
+      const waterfallColors = [resolveColor('var(--gold)'), resolveColor('var(--red)'), resolveColor('var(--red)'), resolveColor('var(--yellow)'), wfEbitda >= 0 ? resolveColor('var(--green)') : resolveColor('var(--red)')];
 
       destroyChart('fin-waterfall');
       const ctx = document.getElementById('fin-waterfall');
